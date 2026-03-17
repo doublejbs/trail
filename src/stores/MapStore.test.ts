@@ -2,11 +2,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MapStore } from './MapStore';
 
 const mockPolyline = { setMap: vi.fn() };
+const mockStartMarker = { setMap: vi.fn() };
+const mockEndMarker = { setMap: vi.fn() };
 const mockMap = { setCenter: vi.fn(), destroy: vi.fn() };
 const mockNaverMaps = {
   Map: vi.fn(function () { return mockMap; }),
   LatLng: vi.fn(function (lat: number, lng: number) { return { lat, lng }; }),
   Polyline: vi.fn(function () { return mockPolyline; }),
+  Marker: vi.fn(),
+  Point: vi.fn(function (x: number, y: number) { return { x, y }; }),
 };
 
 const GPX_TWO_POINTS = `<?xml version="1.0" encoding="UTF-8"?>
@@ -18,6 +22,7 @@ const GPX_TWO_POINTS = `<?xml version="1.0" encoding="UTF-8"?>
 </gpx>`;
 
 const GPX_NO_POINTS = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1"></gpx>`;
+const GPX_ONE_POINT = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1"><trk><trkseg><trkpt lat="37.5" lon="126.9"></trkpt></trkseg></trk></gpx>`;
 const GPX_INVALID_COORDS = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1"><trk><trkseg><trkpt lat="NaN" lon="NaN"></trkpt></trkseg></trk></gpx>`;
 
 describe('MapStore', () => {
@@ -133,8 +138,14 @@ describe('MapStore', () => {
   });
 
   describe('GPX 기능', () => {
+    let markerCallCount = 0;
     beforeEach(() => {
+      markerCallCount = 0;
       mockNaverMaps.Polyline.mockImplementation(function () { return mockPolyline; });
+      mockNaverMaps.Marker.mockImplementation(function () {
+        const count = markerCallCount++;
+        return count === 0 ? mockStartMarker : mockEndMarker;
+      });
       store = new MapStore();
       (window as unknown as Record<string, unknown>).naver = { maps: mockNaverMaps };
       store.initMap(document.createElement('div'));
@@ -204,6 +215,57 @@ describe('MapStore', () => {
         store.destroy();
         expect(mockPolyline.setMap).toHaveBeenCalledWith(null);
         expect(store.gpxPolyline).toBeNull();
+      });
+    });
+
+    describe('마커', () => {
+      it('drawGpxRoute() 후 startMarker가 설정됨', () => {
+        store.drawGpxRoute(GPX_TWO_POINTS);
+        expect(store.startMarker).toBe(mockStartMarker);
+      });
+
+      it('drawGpxRoute() 후 endMarker가 설정됨', () => {
+        store.drawGpxRoute(GPX_TWO_POINTS);
+        expect(store.endMarker).toBe(mockEndMarker);
+      });
+
+      it('시작 마커가 첫 번째 trackpoint 좌표로 생성됨', () => {
+        store.drawGpxRoute(GPX_TWO_POINTS);
+        expect(mockNaverMaps.Marker.mock.calls[0][0].position).toEqual({ lat: 37.5, lng: 126.9 });
+      });
+
+      it('종료 마커가 마지막 trackpoint 좌표로 생성됨', () => {
+        store.drawGpxRoute(GPX_TWO_POINTS);
+        expect(mockNaverMaps.Marker.mock.calls[1][0].position).toEqual({ lat: 37.6, lng: 127.0 });
+      });
+
+      it('trackpoint 1개일 때 endMarker가 null이고 Marker가 1번만 호출됨', () => {
+        store.drawGpxRoute(GPX_ONE_POINT);
+        expect(store.endMarker).toBeNull();
+        expect(mockNaverMaps.Marker).toHaveBeenCalledTimes(1);
+      });
+
+      it('clearGpxRoute() 후 startMarker.setMap(null) 호출 및 null', () => {
+        store.drawGpxRoute(GPX_TWO_POINTS);
+        store.clearGpxRoute();
+        expect(mockStartMarker.setMap).toHaveBeenCalledWith(null);
+        expect(store.startMarker).toBeNull();
+      });
+
+      it('clearGpxRoute() 후 endMarker.setMap(null) 호출 및 null', () => {
+        store.drawGpxRoute(GPX_TWO_POINTS);
+        store.clearGpxRoute();
+        expect(mockEndMarker.setMap).toHaveBeenCalledWith(null);
+        expect(store.endMarker).toBeNull();
+      });
+
+      it('destroy() 후 두 마커 모두 정리됨', () => {
+        store.drawGpxRoute(GPX_TWO_POINTS);
+        store.destroy();
+        expect(mockStartMarker.setMap).toHaveBeenCalledWith(null);
+        expect(mockEndMarker.setMap).toHaveBeenCalledWith(null);
+        expect(store.startMarker).toBeNull();
+        expect(store.endMarker).toBeNull();
       });
     });
   });

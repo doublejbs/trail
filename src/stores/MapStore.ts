@@ -1,12 +1,23 @@
 import { makeAutoObservable, observable, runInAction } from "mobx";
 
+function createPinHtml(color: string): string {
+  return `<div style="width:20px;height:20px;border-radius:50% 50% 50% 0;background:${color};transform:rotate(-45deg);box-shadow:0 2px 6px rgba(0,0,0,0.4);border:2px solid white;"></div>`;
+}
+
 class MapStore {
   public map: naver.maps.Map | null = null;
   public error: boolean = false;
   public gpxPolyline: naver.maps.Polyline | null = null;
+  public startMarker: naver.maps.Marker | null = null;
+  public endMarker: naver.maps.Marker | null = null;
 
   public constructor() {
-    makeAutoObservable(this, { map: observable.ref, gpxPolyline: observable.ref });
+    makeAutoObservable(this, {
+      map: observable.ref,
+      gpxPolyline: observable.ref,
+      startMarker: observable.ref,
+      endMarker: observable.ref,
+    });
   }
 
   public initMap(el: HTMLDivElement): void {
@@ -93,11 +104,41 @@ class MapStore {
 
     this.map.setCenter(path[0]);
     this.gpxPolyline = polyline;
+
+    // 이전 마커 정리 (재호출 시 leak 방지)
+    this.startMarker?.setMap(null);
+    this.startMarker = null;
+    this.endMarker?.setMap(null);
+    this.endMarker = null;
+
+    this.startMarker = new window.naver.maps.Marker({
+      map: this.map,
+      position: path[0],
+      icon: {
+        content: createPinHtml('#4CAF50'),
+        anchor: new window.naver.maps.Point(10, 20),
+      },
+    });
+
+    if (path.length > 1) {
+      this.endMarker = new window.naver.maps.Marker({
+        map: this.map,
+        position: path[path.length - 1],
+        icon: {
+          content: createPinHtml('#F44336'),
+          anchor: new window.naver.maps.Point(10, 20),
+        },
+      });
+    }
   }
 
   public clearGpxRoute(): void {
     this.gpxPolyline?.setMap(null);
     this.gpxPolyline = null;
+    this.startMarker?.setMap(null);
+    this.startMarker = null;
+    this.endMarker?.setMap(null);
+    this.endMarker = null;
   }
 
   public destroy(): void {
