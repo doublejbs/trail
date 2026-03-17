@@ -1,34 +1,32 @@
-import { useLocation, useNavigate } from 'react-router-dom'
-import { Map, Users, Clock, User } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Users, Clock, User } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 interface Tab {
-  path: string
-  label: string
-  icon: ReactNode
+  path: string;
+  label: string;
+  icon: ReactNode;
 }
 
 const TABS: Tab[] = [
-  { path: '/', label: '지도', icon: <Map size={22} strokeWidth={2} /> },
   { path: '/group', label: '그룹', icon: <Users size={22} strokeWidth={2} /> },
   { path: '/history', label: '기록', icon: <Clock size={22} strokeWidth={2} /> },
   { path: '/profile', label: '프로필', icon: <User size={22} strokeWidth={2} /> },
-]
+];
 
 function isActive(tabPath: string, currentPath: string): boolean {
-  if (tabPath === '/') return currentPath === '/'
-  return currentPath.startsWith(tabPath)
+  return currentPath.startsWith(tabPath);
 }
 
 export function BottomTabBar() {
-  const location = useLocation()
-  const navigate = useNavigate()
+  const location = useLocation();
+  const navigate = useNavigate();
 
   return (
     <div className="bg-black border-t border-[#222] flex-shrink-0">
       <div className="flex justify-around items-center pt-2 pb-1">
         {TABS.map((tab) => {
-          const active = isActive(tab.path, location.pathname)
+          const active = isActive(tab.path, location.pathname);
           return (
             <button
               key={tab.path}
@@ -47,7 +45,7 @@ export function BottomTabBar() {
                 {tab.label}
               </span>
             </button>
-          )
+          );
         })}
       </div>
       {/* iOS 홈 인디케이터 */}
@@ -55,5 +53,5 @@ export function BottomTabBar() {
         <div className="w-[100px] h-[4px] bg-white/30 rounded-full" />
       </div>
     </div>
-  )
+  );
 }
