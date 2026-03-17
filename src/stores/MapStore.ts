@@ -78,6 +78,11 @@ class MapStore {
         ),
       );
 
+    if (path.length === 0) {
+      this.error = true;
+      return;
+    }
+
     const polyline = new window.naver.maps.Polyline({
       map: this.map,
       path,

@@ -18,6 +18,7 @@ const GPX_TWO_POINTS = `<?xml version="1.0" encoding="UTF-8"?>
 </gpx>`;
 
 const GPX_NO_POINTS = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1"></gpx>`;
+const GPX_INVALID_COORDS = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1"><trk><trkseg><trkpt lat="NaN" lon="NaN"></trkpt></trkseg></trk></gpx>`;
 
 describe('MapStore', () => {
   let store: MapStore;
@@ -155,6 +156,12 @@ describe('MapStore', () => {
 
       it('trackpoint 없으면 error=true, gpxPolyline=null', () => {
         store.drawGpxRoute(GPX_NO_POINTS);
+        expect(store.error).toBe(true);
+        expect(store.gpxPolyline).toBeNull();
+      });
+
+      it('모든 trackpoint 좌표가 유효하지 않으면 error=true, gpxPolyline=null', () => {
+        store.drawGpxRoute(GPX_INVALID_COORDS);
         expect(store.error).toBe(true);
         expect(store.gpxPolyline).toBeNull();
       });
