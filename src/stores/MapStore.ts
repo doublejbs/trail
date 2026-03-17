@@ -104,7 +104,8 @@ class MapStore {
 
     this.map.setCenter(path[0]);
 
-    // 이전 마커 정리 (재호출 시 leak 방지)
+    // 이전 경로/마커 정리 (재호출 시 leak 방지)
+    this.gpxPolyline?.setMap(null);
     this.startMarker?.setMap(null);
     this.startMarker = null;
     this.endMarker?.setMap(null);

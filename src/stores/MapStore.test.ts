@@ -218,6 +218,14 @@ describe('MapStore', () => {
       });
     });
 
+    describe('재호출 시 이전 경로 정리', () => {
+      it('drawGpxRoute() 재호출 시 이전 polyline.setMap(null) 호출', () => {
+        store.drawGpxRoute(GPX_TWO_POINTS);
+        store.drawGpxRoute(GPX_TWO_POINTS);
+        expect(mockPolyline.setMap).toHaveBeenCalledWith(null);
+      });
+    });
+
     describe('마커', () => {
       it('drawGpxRoute() 후 startMarker가 설정됨', () => {
         store.drawGpxRoute(GPX_TWO_POINTS);
