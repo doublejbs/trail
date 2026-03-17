@@ -1,11 +1,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MapStore } from './MapStore';
 
-const mockMap = { setCenter: vi.fn() };
+const mockPolyline = { setMap: vi.fn() };
+const mockMap = { setCenter: vi.fn(), destroy: vi.fn() };
 const mockNaverMaps = {
   Map: vi.fn(function () { return mockMap; }),
   LatLng: vi.fn(function (lat: number, lng: number) { return { lat, lng }; }),
+  Polyline: vi.fn(function () { return mockPolyline; }),
 };
+
+const GPX_TWO_POINTS = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1">
+  <trk><trkseg>
+    <trkpt lat="37.5" lon="126.9"></trkpt>
+    <trkpt lat="37.6" lon="127.0"></trkpt>
+  </trkseg></trk>
+</gpx>`;
+
+const GPX_NO_POINTS = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1"></gpx>`;
 
 describe('MapStore', () => {
   let store: MapStore;
@@ -116,6 +128,72 @@ describe('MapStore', () => {
       });
       store.locate();
       expect(mockMap.setCenter).toHaveBeenCalledWith({ lat: 37.1, lng: 127.1 });
+    });
+  });
+
+  describe('GPX 기능', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      mockNaverMaps.Map.mockImplementation(function () { return mockMap; });
+      mockNaverMaps.Polyline.mockImplementation(function () { return mockPolyline; });
+      vi.stubEnv('VITE_NAVER_MAP_CLIENT_ID', 'test-key');
+      store = new MapStore();
+      (window as unknown as Record<string, unknown>).naver = { maps: mockNaverMaps };
+      store.initMap(document.createElement('div'));
+    });
+
+    describe('drawGpxRoute()', () => {
+      it('유효한 GPX로 gpxPolyline 설정', () => {
+        store.drawGpxRoute(GPX_TWO_POINTS);
+        expect(store.gpxPolyline).toBe(mockPolyline);
+        expect(store.error).toBe(false);
+      });
+
+      it('trackpoint 없으면 error=true, gpxPolyline=null', () => {
+        store.drawGpxRoute(GPX_NO_POINTS);
+        expect(store.error).toBe(true);
+        expect(store.gpxPolyline).toBeNull();
+      });
+
+      it('첫 번째 trackpoint로 지도 중심 이동', () => {
+        store.drawGpxRoute(GPX_TWO_POINTS);
+        expect(mockMap.setCenter).toHaveBeenCalledWith({ lat: 37.5, lng: 126.9 });
+      });
+
+      it('올바른 좌표 배열로 Polyline 생성', () => {
+        store.drawGpxRoute(GPX_TWO_POINTS);
+        expect(mockNaverMaps.Polyline).toHaveBeenCalledWith(
+          expect.objectContaining({
+            map: mockMap,
+            path: [
+              { lat: 37.5, lng: 126.9 },
+              { lat: 37.6, lng: 127.0 },
+            ],
+          }),
+        );
+      });
+    });
+
+    describe('clearGpxRoute()', () => {
+      it('polyline을 지도에서 제거하고 gpxPolyline=null', () => {
+        store.drawGpxRoute(GPX_TWO_POINTS);
+        store.clearGpxRoute();
+        expect(mockPolyline.setMap).toHaveBeenCalledWith(null);
+        expect(store.gpxPolyline).toBeNull();
+      });
+
+      it('gpxPolyline이 null일 때 오류 없이 실행', () => {
+        expect(() => store.clearGpxRoute()).not.toThrow();
+      });
+    });
+
+    describe('destroy() GPX 정리', () => {
+      it('destroy() 호출 시 gpxPolyline 제거', () => {
+        store.drawGpxRoute(GPX_TWO_POINTS);
+        store.destroy();
+        expect(mockPolyline.setMap).toHaveBeenCalledWith(null);
+        expect(store.gpxPolyline).toBeNull();
+      });
     });
   });
 });
