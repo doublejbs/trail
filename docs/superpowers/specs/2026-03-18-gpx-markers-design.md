@@ -117,7 +117,7 @@ const mockNaverMaps = {
   Map: vi.fn(function () { return mockMap; }),
   LatLng: vi.fn(function (lat: number, lng: number) { return { lat, lng }; }),
   Polyline: vi.fn(function () { return mockPolyline; }),
-  Marker: vi.fn(),  // mockReturnValueOnce로 순서대로 반환
+  Marker: vi.fn(),  // beforeEach에서 counter 기반 mockImplementation으로 설정
   Point: vi.fn(function (x: number, y: number) { return { x, y }; }),
 };
 ```
@@ -128,13 +128,17 @@ GPX 픽스처:
 const GPX_ONE_POINT = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1"><trk><trkseg><trkpt lat="37.5" lon="126.9"></trkpt></trkseg></trk></gpx>`;
 ```
 
-`describe('GPX 기능', ...)` 내 `beforeEach`에서 아이콘 색상 기반 팩토리 mock 사용 (호출 순서에 의존하지 않음):
+`describe('GPX 기능', ...)` 내 `beforeEach`에서 call counter 기반 팩토리 mock 사용:
 
 ```ts
-mockNaverMaps.Marker.mockImplementation((opts: { icon?: { content?: string } }) =>
-  opts.icon?.content?.includes('#4CAF50') ? mockStartMarker : mockEndMarker
-);
+let markerCallCount = 0;
+mockNaverMaps.Marker.mockImplementation(() => {
+  const count = markerCallCount++;
+  return count === 0 ? mockStartMarker : mockEndMarker;
+});
 ```
+
+`beforeEach` 시작 시 `markerCallCount = 0;`으로 리셋.
 
 position 검증은 `mockNaverMaps.Marker.mock.calls[0][0].position`와 `mock.calls[1][0].position`으로 직접 확인.
 
