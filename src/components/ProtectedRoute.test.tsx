@@ -1,15 +1,19 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import { MemoryRouter, Routes, Route } from 'react-router-dom'
-import { ProtectedRoute } from './ProtectedRoute'
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { ProtectedRoute } from './ProtectedRoute';
 
-const { mockUseAuth } = vi.hoisted(() => ({
-  mockUseAuth: vi.fn(),
-}))
+const { mockStore } = vi.hoisted(() => ({
+  mockStore: {
+    user: null as { email: string } | null,
+    loading: true,
+    initialize: vi.fn(() => () => {}),
+  },
+}));
 
-vi.mock('../contexts/AuthContext', () => ({
-  useAuth: () => mockUseAuth(),
-}))
+vi.mock('../stores/AuthStore', () => ({
+  AuthStore: vi.fn(function () { return mockStore; }),
+}));
 
 const renderWithRouter = (initialPath = '/') =>
   render(
@@ -26,26 +30,29 @@ const renderWithRouter = (initialPath = '/') =>
         />
       </Routes>
     </MemoryRouter>
-  )
+  );
 
 describe('ProtectedRoute', () => {
   it('shows spinner while loading', () => {
-    mockUseAuth.mockReturnValue({ user: null, loading: true })
-    renderWithRouter()
-    expect(screen.getByRole('status')).toBeInTheDocument()
-    expect(screen.queryByText('Protected Content')).not.toBeInTheDocument()
-  })
+    mockStore.user = null;
+    mockStore.loading = true;
+    renderWithRouter();
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
+  });
 
   it('redirects to /login when no user', () => {
-    mockUseAuth.mockReturnValue({ user: null, loading: false })
-    renderWithRouter()
-    expect(screen.getByText('Login Page')).toBeInTheDocument()
-    expect(screen.queryByText('Protected Content')).not.toBeInTheDocument()
-  })
+    mockStore.user = null;
+    mockStore.loading = false;
+    renderWithRouter();
+    expect(screen.getByText('Login Page')).toBeInTheDocument();
+    expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
+  });
 
   it('renders children when user is authenticated', () => {
-    mockUseAuth.mockReturnValue({ user: { email: 'test@example.com' }, loading: false })
-    renderWithRouter()
-    expect(screen.getByText('Protected Content')).toBeInTheDocument()
-  })
-})
+    mockStore.user = { email: 'test@example.com' };
+    mockStore.loading = false;
+    renderWithRouter();
+    expect(screen.getByText('Protected Content')).toBeInTheDocument();
+  });
+});
