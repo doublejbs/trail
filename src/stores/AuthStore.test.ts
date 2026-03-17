@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AuthStore } from './AuthStore';
 
 const { mockGetSession, mockOnAuthStateChange, mockSignOut, mockExchangeCodeForSession } = vi.hoisted(() => ({
