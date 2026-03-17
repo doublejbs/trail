@@ -127,6 +127,18 @@ function useNaverMap(ref: RefObject<HTMLDivElement>): {
 - **ProfilePage:** 탭 이름 + "준비 중" 텍스트 + **로그아웃 버튼** (`useAuth().signOut()` 호출)
 - 레이아웃: `flex h-full flex-col items-center justify-center gap-4`
 
+## shadcn/ui 컴포넌트 사용
+
+모든 인터랙티브 UI 요소는 shadcn/ui 컴포넌트를 사용한다.
+
+| 위치 | 컴포넌트 | 설치 여부 |
+|------|----------|----------|
+| ProfilePage 로그아웃 버튼 | `Button` (variant="outline") | 기설치 |
+| MapPage 내 위치 버튼 | `Button` (variant="secondary", size="icon") | 기설치 |
+| 에러 상태 텍스트 | 기본 Tailwind 텍스트 (shadcn 불필요) | — |
+
+`BottomTabBar`는 shadcn 컴포넌트가 없으므로 Tailwind 클래스로 직접 구현한다.
+
 ## 네이버 지도 설정
 
 ### index.html 스크립트 추가
