@@ -1,0 +1,74 @@
+import { makeAutoObservable, runInAction } from 'mobx';
+import { supabase } from '../lib/supabase';
+
+class GroupCreateStore {
+  public name: string = '';
+  public file: File | null = null;
+  public submitting: boolean = false;
+  public error: string | null = null;
+
+  public constructor() {
+    makeAutoObservable(this);
+  }
+
+  public setName(v: string): void {
+    this.name = v;
+  }
+
+  public setFile(f: File | null): void {
+    this.file = f;
+  }
+
+  public get isValid(): boolean {
+    return this.name.trim() !== '' && this.file !== null;
+  }
+
+  public async submit(): Promise<string | null> {
+    this.submitting = true;
+    this.error = null;
+
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData.user) {
+      runInAction(() => {
+        this.error = '인증 오류가 발생했습니다';
+        this.submitting = false;
+      });
+      return null;
+    }
+
+    const userId = userData.user.id;
+    const groupId = crypto.randomUUID();
+    const path = `${userId}/${groupId}.gpx`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('gpx-files')
+      .upload(path, this.file!);
+
+    if (uploadError) {
+      runInAction(() => {
+        this.error = uploadError.message;
+        this.submitting = false;
+      });
+      return null;
+    }
+
+    const { error: insertError } = await supabase
+      .from('groups')
+      .insert({ id: groupId, name: this.name, created_by: userId, gpx_path: path });
+
+    if (insertError) {
+      runInAction(() => {
+        this.error = insertError.message;
+        this.submitting = false;
+      });
+      return null;
+    }
+
+    runInAction(() => {
+      this.submitting = false;
+    });
+    return groupId;
+  }
+}
+
+export { GroupCreateStore };
