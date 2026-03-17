@@ -133,16 +133,20 @@ describe('MapStore', () => {
 
   describe('GPX 기능', () => {
     beforeEach(() => {
-      vi.clearAllMocks();
-      mockNaverMaps.Map.mockImplementation(function () { return mockMap; });
       mockNaverMaps.Polyline.mockImplementation(function () { return mockPolyline; });
-      vi.stubEnv('VITE_NAVER_MAP_CLIENT_ID', 'test-key');
       store = new MapStore();
       (window as unknown as Record<string, unknown>).naver = { maps: mockNaverMaps };
       store.initMap(document.createElement('div'));
     });
 
     describe('drawGpxRoute()', () => {
+      it('map이 null이면 error=true 설정 후 반환', () => {
+        store = new MapStore(); // map이 null인 새 store
+        store.drawGpxRoute(GPX_TWO_POINTS);
+        expect(store.error).toBe(true);
+        expect(store.gpxPolyline).toBeNull();
+      });
+
       it('유효한 GPX로 gpxPolyline 설정', () => {
         store.drawGpxRoute(GPX_TWO_POINTS);
         expect(store.gpxPolyline).toBe(mockPolyline);

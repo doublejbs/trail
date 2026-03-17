@@ -45,8 +45,19 @@ class MapStore {
   }
 
   public drawGpxRoute(gpxText: string): void {
+    if (!this.map) {
+      this.error = true;
+      return;
+    }
+
     const parser = new DOMParser();
     const doc = parser.parseFromString(gpxText, 'application/xml');
+
+    if (doc.querySelector('parsererror')) {
+      this.error = true;
+      return;
+    }
+
     const trkpts = Array.from(doc.getElementsByTagName('trkpt'));
 
     if (trkpts.length === 0) {
@@ -54,22 +65,28 @@ class MapStore {
       return;
     }
 
-    const path = trkpts.map((pt) =>
-      new window.naver.maps.LatLng(
-        parseFloat(pt.getAttribute('lat')!),
-        parseFloat(pt.getAttribute('lon')!),
-      ),
-    );
+    const path = trkpts
+      .filter((pt) => {
+        const lat = parseFloat(pt.getAttribute('lat') ?? '');
+        const lon = parseFloat(pt.getAttribute('lon') ?? '');
+        return !isNaN(lat) && !isNaN(lon);
+      })
+      .map((pt) =>
+        new window.naver.maps.LatLng(
+          parseFloat(pt.getAttribute('lat')!),
+          parseFloat(pt.getAttribute('lon')!),
+        ),
+      );
 
     const polyline = new window.naver.maps.Polyline({
-      map: this.map!,
+      map: this.map,
       path,
       strokeColor: '#FF5722',
       strokeWeight: 4,
       strokeOpacity: 0.8,
     });
 
-    this.map!.setCenter(path[0]);
+    this.map.setCenter(path[0]);
     this.gpxPolyline = polyline;
   }
 
