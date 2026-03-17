@@ -4,6 +4,7 @@ import { LoginPage } from './pages/LoginPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { MainLayout } from './pages/MainLayout';
 import { GroupPage } from './pages/GroupPage';
+import { GroupCreatePage } from './pages/GroupCreatePage';
 import { GroupMapPage } from './pages/GroupMapPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { ProfilePage } from './pages/ProfilePage';
@@ -24,6 +25,7 @@ export default function App() {
         >
           <Route index element={<Navigate to="/group" replace />} />
           <Route path="group" element={<GroupPage />} />
+          <Route path="group/new" element={<GroupCreatePage />} />
           <Route path="group/:id" element={<GroupMapPage />} />
           <Route path="history" element={<HistoryPage />} />
           <Route path="profile" element={<ProfilePage />} />
