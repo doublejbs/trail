@@ -1,25 +1,19 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter, Routes, Route } from 'react-router-dom'
-import type { User } from '@supabase/supabase-js'
-import { AuthCallbackPage } from './AuthCallbackPage'
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import type { User } from '@supabase/supabase-js';
+import { AuthCallbackPage } from './AuthCallbackPage';
 
-const { mockExchangeCodeForSession, mockUseAuth } = vi.hoisted(() => ({
-  mockExchangeCodeForSession: vi.fn(),
-  mockUseAuth: vi.fn(),
-}))
-
-vi.mock('../lib/supabase', () => ({
-  supabase: {
-    auth: {
-      exchangeCodeForSession: (code: string) => mockExchangeCodeForSession(code),
-    },
+const { mockStore } = vi.hoisted(() => ({
+  mockStore: {
+    user: null as User | null,
+    exchangeCode: vi.fn(),
   },
-}))
+}));
 
-vi.mock('../contexts/AuthContext', () => ({
-  useAuth: () => mockUseAuth(),
-}))
+vi.mock('../stores/AuthStore', () => ({
+  AuthStore: vi.fn(function () { return mockStore; }),
+}));
 
 const renderCallback = (search = '?code=test-code') =>
   render(
@@ -31,52 +25,52 @@ const renderCallback = (search = '?code=test-code') =>
         <Route path="/map" element={<div>Map Page</div>} />
       </Routes>
     </MemoryRouter>
-  )
+  );
 
-const fakeUser = { id: 'user-1' } as User
+const fakeUser = { id: 'user-1' } as User;
 
 describe('AuthCallbackPage', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
-    mockUseAuth.mockReturnValue({ user: null })
-  })
+    vi.clearAllMocks();
+    mockStore.user = null;
+  });
 
   it('shows loading spinner initially', () => {
-    mockExchangeCodeForSession.mockImplementation(() => new Promise(() => {}))
-    renderCallback()
-    expect(screen.getByRole('status')).toBeInTheDocument()
-  })
+    mockStore.exchangeCode.mockImplementation(() => new Promise(() => {}));
+    renderCallback();
+    expect(screen.getByRole('status')).toBeInTheDocument();
+  });
 
   it('redirects to / once exchange succeeds and user is set', async () => {
-    mockExchangeCodeForSession.mockResolvedValue({ error: null })
-    mockUseAuth.mockReturnValue({ user: fakeUser })
-    renderCallback()
+    mockStore.exchangeCode.mockResolvedValue(true);
+    mockStore.user = fakeUser;
+    renderCallback();
     await waitFor(() => {
-      expect(screen.getByText('Home')).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText('Home')).toBeInTheDocument();
+    });
+  });
 
   it('redirects to /login on error', async () => {
-    mockExchangeCodeForSession.mockResolvedValue({ error: { message: 'invalid code' } })
-    renderCallback()
+    mockStore.exchangeCode.mockResolvedValue(false);
+    renderCallback();
     await waitFor(() => {
-      expect(screen.getByText('Login')).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText('Login')).toBeInTheDocument();
+    });
+  });
 
   it('redirects to next param path on success', async () => {
-    mockExchangeCodeForSession.mockResolvedValue({ error: null })
-    mockUseAuth.mockReturnValue({ user: fakeUser })
-    renderCallback('?code=abc&next=%2Fmap')
+    mockStore.exchangeCode.mockResolvedValue(true);
+    mockStore.user = fakeUser;
+    renderCallback('?code=abc&next=%2Fmap');
     await waitFor(() => {
-      expect(screen.getByText('Map Page')).toBeInTheDocument()
-    })
-  })
+      expect(screen.getByText('Map Page')).toBeInTheDocument();
+    });
+  });
 
   it('redirects to /login when no code param', async () => {
-    renderCallback('')
+    renderCallback('');
     await waitFor(() => {
-      expect(screen.getByText('Login')).toBeInTheDocument()
-    })
-  })
-})
+      expect(screen.getByText('Login')).toBeInTheDocument();
+    });
+  });
+});

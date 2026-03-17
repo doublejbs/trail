@@ -1,41 +1,37 @@
-import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
-import { useAuth } from '../contexts/AuthContext'
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { observer } from 'mobx-react-lite';
+import { AuthStore } from '../stores/AuthStore';
 
-export function AuthCallbackPage() {
-  const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
-  const { user } = useAuth()
-  const [exchanged, setExchanged] = useState(false)
-  const attemptedRef = useRef(false)
-  const next = searchParams.get('next') ?? '/'
+export const AuthCallbackPage = observer(() => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [store] = useState(() => new AuthStore());
+  const [exchanged, setExchanged] = useState(false);
+  const next = searchParams.get('next') ?? '/';
 
-  // Step 1: exchange the code (once — guard against StrictMode double-invoke)
+  // Step 1: exchange the code (once — guard inside AuthStore prevents double-invoke)
   useEffect(() => {
-    if (attemptedRef.current) return
-    attemptedRef.current = true
-
-    const code = searchParams.get('code')
+    const code = searchParams.get('code');
     if (!code) {
-      navigate('/login', { replace: true })
-      return
+      navigate('/login', { replace: true });
+      return;
     }
-    supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
-      if (error) {
-        navigate('/login', { replace: true })
+    store.exchangeCode(code).then((success) => {
+      if (success) {
+        setExchanged(true);
       } else {
-        setExchanged(true)
+        navigate('/login', { replace: true });
       }
-    })
-  }, [navigate, searchParams])
+    });
+  }, [navigate, searchParams, store]);
 
-  // Step 2: navigate only after user is confirmed in context
+  // Step 2: navigate only after user is confirmed in store
   useEffect(() => {
-    if (exchanged && user) {
-      navigate(next, { replace: true })
+    if (exchanged && store.user) {
+      navigate(next, { replace: true });
     }
-  }, [exchanged, user, navigate, next])
+  }, [exchanged, store.user, navigate, next]);
 
   return (
     <div
@@ -45,5 +41,5 @@ export function AuthCallbackPage() {
     >
       <div className="h-8 w-8 animate-spin rounded-full border-4 border-neutral-900 border-t-transparent" />
     </div>
-  )
-}
+  );
+});
