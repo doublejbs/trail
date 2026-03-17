@@ -3,7 +3,11 @@ import { AuthProvider } from './contexts/AuthContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { LoginPage } from './pages/LoginPage'
 import { AuthCallbackPage } from './pages/AuthCallbackPage'
-import { HomePage } from './pages/HomePage'
+import { MainLayout } from './pages/MainLayout'
+import { MapPage } from './pages/MapPage'
+import { GroupPage } from './pages/GroupPage'
+import { HistoryPage } from './pages/HistoryPage'
+import { ProfilePage } from './pages/ProfilePage'
 
 export default function App() {
   return (
@@ -16,10 +20,15 @@ export default function App() {
             path="/"
             element={
               <ProtectedRoute>
-                <HomePage />
+                <MainLayout />
               </ProtectedRoute>
             }
-          />
+          >
+            <Route index element={<MapPage />} />
+            <Route path="group" element={<GroupPage />} />
+            <Route path="history" element={<HistoryPage />} />
+            <Route path="profile" element={<ProfilePage />} />
+          </Route>
         </Routes>
       </AuthProvider>
     </BrowserRouter>

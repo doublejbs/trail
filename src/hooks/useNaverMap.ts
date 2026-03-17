@@ -5,7 +5,7 @@ interface UseNaverMapResult {
   error: boolean
 }
 
-export function useNaverMap(ref: RefObject<HTMLDivElement>): UseNaverMapResult {
+export function useNaverMap(ref: RefObject<HTMLDivElement | null>): UseNaverMapResult {
   const [map, setMap] = useState<naver.maps.Map | null>(null)
   const [error, setError] = useState(false)
 
