@@ -4,26 +4,101 @@ import { observer } from 'mobx-react-lite';
 import { Button } from '@/components/ui/button';
 import { Crosshair } from 'lucide-react';
 import { MapStore } from '../stores/MapStore';
-import { DUMMY_GROUPS } from '../data/groups';
+import { supabase } from '../lib/supabase';
+import type { Group } from '../types/group';
 
 export const GroupMapPage = observer(() => {
   const { id } = useParams();
   const navigate = useNavigate();
   const mapRef = useRef<HTMLDivElement>(null);
   const [store] = useState(() => new MapStore());
-  const group = DUMMY_GROUPS.find((g) => g.id === Number(id));
+  const [group, setGroup] = useState<Group | null | undefined>(undefined);
+  const [gpxText, setGpxText] = useState<string | null | undefined>(undefined);
 
+  // Effect 1: Fetch group + GPX (no DOM dependency)
   useEffect(() => {
-    if (!mapRef.current || !group) return;
-    store.initMap(mapRef.current);
-    return () => store.destroy();
-    // group excluded from deps: re-running initMap/destroy on re-render would
-    // break the Naver Maps SDK lifecycle. The !group guard handles the render
-    // before <Navigate> below is committed.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store]);
+    let cancelled = false;
 
-  if (!group) return <Navigate to="/group" replace />;
+    (async () => {
+      // 1. Supabase에서 그룹 조회
+      const { data, error } = await supabase
+        .from('groups')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (cancelled) return;
+
+      if (error || !data) {
+        setGroup(null);
+        return;
+      }
+
+      setGroup(data as Group);
+
+      // 2. Signed URL 생성
+      const { data: urlData, error: urlError } = await supabase.storage
+        .from('gpx-files')
+        .createSignedUrl((data as Group).gpx_path, 3600);
+
+      if (cancelled) return;
+
+      if (urlError || !urlData?.signedUrl) {
+        setGpxText(null);
+        return;
+      }
+
+      // 3. GPX 텍스트 fetch
+      try {
+        const response = await fetch(urlData.signedUrl);
+        if (!response.ok) throw new Error('GPX fetch failed');
+        const text = await response.text();
+        if (!cancelled) {
+          setGpxText(text);
+        }
+      } catch {
+        if (!cancelled) {
+          setGpxText(null);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  // Effect 2: Init map + draw route once DOM ref & GPX text are ready
+  useEffect(() => {
+    if (!mapRef.current || gpxText === undefined || group === undefined || group === null) return;
+
+    store.initMap(mapRef.current);
+
+    if (gpxText !== null) {
+      store.drawGpxRoute(gpxText);
+    } else {
+      store.error = true;
+    }
+
+    return () => {
+      store.destroy();
+    };
+  }, [store, gpxText, group]);
+
+  // 그룹 없음 → 리다이렉트 (로딩 완료 여부와 무관하게 즉시)
+  if (group === null) return <Navigate to="/group" replace />;
+
+  // 로딩 중
+  if (group === undefined || gpxText === undefined) {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center bg-black">
+        <div
+          role="status"
+          className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="absolute inset-0">
