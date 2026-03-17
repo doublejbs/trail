@@ -103,13 +103,14 @@ class MapStore {
     });
 
     this.map.setCenter(path[0]);
-    this.gpxPolyline = polyline;
 
     // 이전 마커 정리 (재호출 시 leak 방지)
     this.startMarker?.setMap(null);
     this.startMarker = null;
     this.endMarker?.setMap(null);
     this.endMarker = null;
+
+    this.gpxPolyline = polyline;
 
     this.startMarker = new window.naver.maps.Marker({
       map: this.map,
