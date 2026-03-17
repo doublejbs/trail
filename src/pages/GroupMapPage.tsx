@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
+import { runInAction } from 'mobx';
 import { Button } from '@/components/ui/button';
 import { Crosshair } from 'lucide-react';
 import { MapStore } from '../stores/MapStore';
@@ -70,14 +71,16 @@ export const GroupMapPage = observer(() => {
 
   // Effect 2: Init map + draw route once DOM ref & GPX text are ready
   useEffect(() => {
-    if (!mapRef.current || gpxText === undefined || group === undefined || group === null) return;
+    if (!mapRef.current || gpxText === undefined || group === undefined || group === null) {
+      return () => { store.destroy(); };
+    }
 
     store.initMap(mapRef.current);
 
     if (gpxText !== null) {
       store.drawGpxRoute(gpxText);
     } else {
-      store.error = true;
+      runInAction(() => { store.error = true; });
     }
 
     return () => {
