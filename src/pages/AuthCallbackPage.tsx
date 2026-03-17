@@ -1,28 +1,37 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 
 export function AuthCallbackPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const { user } = useAuth()
+  const [exchanged, setExchanged] = useState(false)
+  const next = searchParams.get('next') ?? '/'
 
+  // Step 1: exchange the code
   useEffect(() => {
     const code = searchParams.get('code')
-    const next = searchParams.get('next') ?? '/'
-
     if (!code) {
       navigate('/login', { replace: true })
       return
     }
-
     supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
       if (error) {
         navigate('/login', { replace: true })
       } else {
-        navigate(next, { replace: true })
+        setExchanged(true)
       }
     })
   }, [navigate, searchParams])
+
+  // Step 2: navigate only after user is confirmed in context
+  useEffect(() => {
+    if (exchanged && user) {
+      navigate(next, { replace: true })
+    }
+  }, [exchanged, user, navigate, next])
 
   return (
     <div
