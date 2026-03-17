@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -8,10 +8,14 @@ export function AuthCallbackPage() {
   const [searchParams] = useSearchParams()
   const { user } = useAuth()
   const [exchanged, setExchanged] = useState(false)
+  const attemptedRef = useRef(false)
   const next = searchParams.get('next') ?? '/'
 
-  // Step 1: exchange the code
+  // Step 1: exchange the code (once — guard against StrictMode double-invoke)
   useEffect(() => {
+    if (attemptedRef.current) return
+    attemptedRef.current = true
+
     const code = searchParams.get('code')
     if (!code) {
       navigate('/login', { replace: true })
