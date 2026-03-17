@@ -1,10 +1,10 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { MainLayout } from './pages/MainLayout';
-import { MapPage } from './pages/MapPage';
 import { GroupPage } from './pages/GroupPage';
+import { GroupMapPage } from './pages/GroupMapPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { ProfilePage } from './pages/ProfilePage';
 
@@ -22,8 +22,9 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<MapPage />} />
+          <Route index element={<Navigate to="/group" replace />} />
           <Route path="group" element={<GroupPage />} />
+          <Route path="group/:id" element={<GroupMapPage />} />
           <Route path="history" element={<HistoryPage />} />
           <Route path="profile" element={<ProfilePage />} />
         </Route>
