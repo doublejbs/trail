@@ -1,25 +1,25 @@
-# Group Creation Design
+# 그룹 생성 설계
 
-**Date:** 2026-03-18
+**날짜:** 2026-03-18
 
-## Overview
+## 개요
 
-Replace dummy group data with real Supabase-backed groups. Users can create groups with a name and a GPX file. The group map view fetches the GPX from Storage and draws the route as a polyline via `MapStore`.
+더미 그룹 데이터를 실제 Supabase 기반 그룹으로 교체한다. 사용자는 그룹명과 GPX 파일로 그룹을 생성할 수 있다. 그룹 지도 뷰에서는 Storage에서 GPX를 가져와 `MapStore`를 통해 경로를 폴리라인으로 그린다.
 
-## Scope
+## 범위
 
-- Supabase `groups` table + `gpx-files` Storage bucket
-- `GroupPage`: list my groups, navigate to create/map
-- `GroupCreatePage` (`/group/new`): form with group name + GPX upload
-- `GroupMapPage`: fetch group from Supabase, draw GPX polyline via `MapStore`
-- `MapStore`: add GPX parsing + polyline drawing
-- Delete `src/data/groups.ts`
+- Supabase `groups` 테이블 + `gpx-files` Storage 버킷
+- `GroupPage`: 내 그룹 목록 표시, 생성/지도로 이동
+- `GroupCreatePage` (`/group/new`): 그룹명 + GPX 업로드 폼
+- `GroupMapPage`: Supabase에서 그룹 조회, `MapStore`로 GPX 폴리라인 표시
+- `MapStore`: GPX 파싱 + 폴리라인 그리기 추가
+- `src/data/groups.ts` 삭제
 
-**Out of scope (deferred):** group invites, member management, shared groups.
+**범위 외 (추후 구현):** 그룹 초대, 멤버 관리, 공유 그룹.
 
-## Database Schema
+## 데이터베이스 스키마
 
-Run in Supabase SQL editor:
+Supabase SQL 편집기에서 실행:
 
 ```sql
 create table groups (
@@ -41,13 +41,13 @@ create policy "owner insert"
   with check (auth.uid() = created_by);
 ```
 
-No delete policy is intentional — group deletion is out of scope for this feature.
+delete 정책을 의도적으로 추가하지 않는다 — 그룹 삭제는 이번 기능 범위 외이다.
 
 ## Storage
 
-- Bucket name: `gpx-files` (private, no public access)
-- Object path: `{user_id}/{group_id}.gpx`
-- RLS on `storage.objects`:
+- 버킷명: `gpx-files` (비공개, 공개 접근 없음)
+- 객체 경로: `{user_id}/{group_id}.gpx`
+- `storage.objects` RLS:
 
 ```sql
 create policy "owner upload"
@@ -59,11 +59,11 @@ create policy "owner read"
   using (bucket_id = 'gpx-files' and auth.uid()::text = (storage.foldername(name))[1]);
 ```
 
-GPX files are accessed via Signed URLs (60-minute expiry) generated at read time.
+GPX 파일은 읽기 시점에 생성하는 Signed URL(60분 만료)로 접근한다.
 
-## TypeScript Types
+## TypeScript 타입
 
-Create `src/types/group.ts`:
+`src/types/group.ts` 생성:
 
 ```ts
 export interface Group {
@@ -75,11 +75,11 @@ export interface Group {
 }
 ```
 
-## Stores
+## 스토어
 
 ### `GroupStore` (`src/stores/GroupStore.ts`)
 
-Responsibilities: fetch the current user's group list from Supabase.
+역할: Supabase에서 현재 사용자의 그룹 목록을 가져온다.
 
 ```ts
 class GroupStore {
@@ -87,19 +87,19 @@ class GroupStore {
   loading: boolean = true;
   error: boolean = false;
 
-  async load(): Promise<void>  // fetch groups where created_by = auth.uid()
+  async load(): Promise<void>  // created_by = auth.uid() 조건으로 그룹 조회
 }
 ```
 
-`load()` sets `loading = true` at the start, queries Supabase, then on success sets `groups` and sets `loading = false`; on failure sets `error = true` and sets `loading = false`. Both paths always reset `loading` to `false`. The initial value of `loading: true` is intentional — it keeps `GroupPage` in spinner state until the first `load()` call completes.
+`load()`는 시작 시 `loading = true`로 설정하고 Supabase를 쿼리한다. 성공 시 `groups`를 설정하고 `loading = false`로 리셋; 실패 시 `error = true`로 설정하고 `loading = false`로 리셋한다. 두 경로 모두 반드시 `loading`을 `false`로 리셋한다. `loading: true` 초기값은 의도적이다 — 첫 `load()` 호출이 완료될 때까지 `GroupPage`를 스피너 상태로 유지한다.
 
-`GroupPage` calls `GroupStore.load()` every time it mounts. Since React Router v6 fully unmounts `GroupPage` when navigating to a child route and remounts it on return, a fresh `load()` is always triggered — the new group will be visible after returning from `GroupCreatePage` without any additional cache invalidation.
+`GroupPage`는 마운트될 때마다 `GroupStore.load()`를 호출한다. React Router v6는 하위 경로로 이동 시 `GroupPage`를 완전히 언마운트하고 돌아올 때 다시 마운트하므로, 별도의 캐시 무효화 없이 `GroupCreatePage`에서 돌아오면 새 그룹이 목록에 표시된다.
 
-**Error type note:** `GroupStore.error` is `boolean` (fetch either worked or it didn't). `GroupCreateStore.error` is `string | null` to surface specific upload/insert failure messages to the user.
+**에러 타입 비고:** `GroupStore.error`는 `boolean` (조회 성공/실패). `GroupCreateStore.error`는 `string | null` — 업로드/삽입 실패 메시지를 사용자에게 구체적으로 전달하기 위해 문자열을 사용한다.
 
 ### `GroupCreateStore` (`src/stores/GroupCreateStore.ts`)
 
-Responsibilities: hold form state and orchestrate GPX upload + DB insert.
+역할: 폼 상태 관리, GPX 업로드 + DB 삽입 처리.
 
 ```ts
 class GroupCreateStore {
@@ -112,83 +112,83 @@ class GroupCreateStore {
   setFile(f: File | null): void
   get isValid(): boolean  // name.trim() !== '' && file !== null
 
-  // Returns new group id on success, null on failure
+  // 성공 시 새 그룹 id 반환, 실패 시 null 반환
   async submit(): Promise<string | null>
 }
 ```
 
-`submit()` takes no arguments — it calls `supabase.auth.getUser()` internally to obtain `userId`. This keeps the caller free from auth concerns.
+`submit()`은 인자를 받지 않는다 — 내부에서 `supabase.auth.getUser()`를 호출해 `userId`를 가져온다. 호출부에서 인증을 신경 쓰지 않아도 된다.
 
-`submit` steps:
-1. Call `supabase.auth.getUser()` to get `userId`. On failure, set `error` and return `null`.
-2. Generate a UUID for the new group: `const groupId = crypto.randomUUID()`.
-3. Upload `file` to `gpx-files/{userId}/{groupId}.gpx` using the pre-generated `groupId`.
-4. Insert row into `groups` with `id: groupId`, `name`, `created_by: userId`, `gpx_path: '{userId}/{groupId}.gpx'`.
-5. Return `groupId` on success; set `error` and return `null` on any failure.
+`submit` 단계:
+1. `supabase.auth.getUser()`로 `userId` 획득. 실패 시 `error` 설정 후 `null` 반환.
+2. 새 그룹 UUID 생성: `const groupId = crypto.randomUUID()`.
+3. 미리 생성한 `groupId`를 사용해 `file`을 `gpx-files/{userId}/{groupId}.gpx`에 업로드.
+4. `groups` 테이블에 `id: groupId`, `name`, `created_by: userId`, `gpx_path: '{userId}/{groupId}.gpx'` 행 삽입.
+5. 성공 시 `groupId` 반환; 실패 시 `error` 설정 후 `null` 반환.
 
-Using `crypto.randomUUID()` before the upload means the same UUID is used for both the Storage path and the DB row `id`, guaranteeing they match without a second round-trip.
+업로드 전에 `crypto.randomUUID()`로 UUID를 생성하므로 Storage 경로와 DB 행의 `id`가 동일한 UUID를 사용한다 — 추가 라운드트립 없이 일치가 보장된다.
 
-### `MapStore` additions (`src/stores/MapStore.ts`)
+### `MapStore` 추가 사항 (`src/stores/MapStore.ts`)
 
-Add GPX polyline support:
+GPX 폴리라인 지원 추가:
 
 ```ts
-// New observables
-gpxPolyline: naver.maps.Polyline | null = null  // declared observable.ref in makeAutoObservable options, same as map
+// 새 observable
+gpxPolyline: naver.maps.Polyline | null = null  // makeAutoObservable 옵션에 observable.ref로 선언, map과 동일
 
-// New methods
+// 새 메서드
 drawGpxRoute(gpxText: string): void
-  // 1. Parse gpxText with DOMParser
-  // 2. Extract <trkpt lat lon> elements
-  // 3. If no points found, set error = true and return
-  // 4. Create naver.maps.Polyline with extracted LatLng array, set map to this.map
-  // 5. Set map center to first trackpoint (zoom level unchanged)
-  // 6. Store polyline in gpxPolyline
+  // 1. DOMParser로 gpxText 파싱
+  // 2. <trkpt lat lon> 요소 추출
+  // 3. 포인트 없으면 error = true 설정 후 반환
+  // 4. 추출한 LatLng 배열로 naver.maps.Polyline 생성, map을 this.map으로 설정
+  // 5. 첫 번째 trackpoint로 지도 중심 이동 (줌 레벨 유지)
+  // 6. gpxPolyline에 폴리라인 저장
 
 clearGpxRoute(): void
-  // Remove polyline from map (polyline.setMap(null)), set gpxPolyline = null
+  // 폴리라인을 지도에서 제거 (polyline.setMap(null)), gpxPolyline = null
 
-// Update destroy() to also call clearGpxRoute()
-// Callers should always use destroy() for cleanup — never call clearGpxRoute() directly on unmount
+// destroy()가 clearGpxRoute()도 호출하도록 업데이트
+// 언마운트 정리 시 항상 destroy()를 사용할 것 — clearGpxRoute()를 직접 호출하지 않는다
 ```
 
-GPX parsing uses browser-native `DOMParser` — no additional npm dependency.
+GPX 파싱은 브라우저 기본 `DOMParser`를 사용한다 — 별도 npm 의존성 없음.
 
-**Camera behavior:** `drawGpxRoute` pans to the first trackpoint via `this.map.setCenter(firstLatLng)` but does not change the zoom level. This gives a predictable experience without guessing an appropriate zoom for arbitrary GPX files.
+**카메라 동작:** `drawGpxRoute`는 `this.map.setCenter(firstLatLng)`으로 첫 번째 trackpoint로 패닝하지만 줌 레벨은 변경하지 않는다. 임의 GPX 파일에 적합한 줌을 추측하지 않고 예측 가능한 동작을 제공한다.
 
-## Screens
+## 화면
 
 ### `GroupPage` (`/group`)
 
-- On mount: call `GroupStore.load()`
-- Loading state: spinner
-- Error state: "그룹을 불러올 수 없습니다" message
-- Empty state: "아직 그룹이 없습니다" message
-- List: each row shows `group.name`, taps to `/group/{id}`
-- FAB (`+`) bottom-right → navigate to `/group/new`
+- 마운트 시: `GroupStore.load()` 호출
+- 로딩 상태: 스피너
+- 에러 상태: "그룹을 불러올 수 없습니다" 메시지
+- 빈 상태: "아직 그룹이 없습니다" 메시지
+- 목록: 각 행에 `group.name` 표시, 탭 시 `/group/{id}`로 이동
+- FAB (`+`) 우측 하단 → `/group/new`로 이동
 
 ### `GroupCreatePage` (`/group/new`)
 
-Layout: full-screen dark page with back button, form below.
+레이아웃: 뒤로가기 버튼이 있는 전체 화면 다크 페이지, 아래에 폼.
 
-- Back button (top-left) → `/group`
-- Group name: text input
-- GPX file: file input accepting `.gpx` only, shows selected filename or "파일 선택"
-- Submit button: disabled while `!isValid || submitting`, shows spinner while submitting
-- On success: navigate to `/group`
-- On error: `toast.error(store.error)`
+- 뒤로가기 버튼 (좌측 상단) → `/group`
+- 그룹명: 텍스트 입력
+- GPX 파일: `.gpx`만 허용하는 파일 입력, 선택된 파일명 또는 "파일 선택" 표시
+- 제출 버튼: `!isValid || submitting`이면 비활성화, 제출 중 스피너 표시
+- 성공 시: `/group`으로 이동
+- 에러 시: `toast.error(store.error)`
 
 ### `GroupMapPage` (`/group/:id`)
 
-Changes from current implementation:
+현재 구현에서의 변경 사항:
 
-1. **Fetch group** from Supabase by id (where `created_by = auth.uid()`). If not found → `<Navigate to="/group" replace />`
-2. **Generate Signed URL** for `group.gpx_path`
-3. **Fetch GPX text** from Signed URL
+1. **그룹 조회** — Supabase에서 id로 그룹 조회 (`created_by = auth.uid()` 조건). 없으면 → `<Navigate to="/group" replace />`
+2. **Signed URL 생성** — `group.gpx_path`에 대한 Signed URL 생성
+3. **GPX 텍스트 가져오기** — Signed URL에서 GPX 텍스트 fetch
 
-**Loading state:** Use a local `useState<boolean>` (`gpxLoading`) within `GroupMapPage`. Show a full-screen spinner overlay while `gpxLoading` is true (i.e., from effect start until fetch completes or fails). This is separate from `MapStore.error`, which covers map SDK and GPX parse failures.
+**로딩 상태:** `GroupMapPage` 내부에 로컬 `useState<boolean>` (`gpxLoading`)을 사용한다. `gpxLoading`이 true인 동안 전체 화면 스피너 오버레이를 표시한다 (effect 시작부터 fetch 완료 또는 실패까지). 이는 지도 SDK 및 GPX 파싱 실패를 담당하는 `MapStore.error`와 별개이다.
 
-**Async coordination and dependency array:** The Supabase fetch and GPX download happen in a single `useEffect` that also calls `store.initMap(el)`. `initMap` is synchronous — it initialises the Naver SDK immediately. After `initMap` returns, `store.map` is set and `drawGpxRoute` can be called safely. The effect uses `[store]` as its dependency array; `id` from `useParams` is intentionally excluded (same reasoning as the current `group` exclusion — re-running `initMap`/`destroy` on `id` changes would break the Naver Maps SDK lifecycle). Each group map view mounts a fresh `GroupMapPage` instance via React Router, so stale `id` is not a concern.
+**비동기 처리 및 의존성 배열:** Supabase fetch와 GPX 다운로드는 `store.initMap(el)`도 호출하는 단일 `useEffect`에서 처리된다. `initMap`은 동기적 — Naver SDK를 즉시 초기화한다. `initMap`이 반환되면 `store.map`이 설정되고 `drawGpxRoute`를 안전하게 호출할 수 있다. effect의 의존성 배열은 `[store]`; `useParams`의 `id`는 의도적으로 제외한다 (현재 `group` 제외와 동일한 이유 — `id` 변경 시 `initMap`/`destroy` 재실행은 Naver Maps SDK 라이프사이클을 깨뜨린다). React Router가 각 그룹 지도 뷰에서 새 `GroupMapPage` 인스턴스를 마운트하므로 stale `id`는 문제가 되지 않는다.
 
 ```ts
 const [gpxLoading, setGpxLoading] = useState(true);
@@ -200,10 +200,10 @@ useEffect(() => {
 
   let cancelled = false;
   (async () => {
-    // 1. Fetch group from Supabase by id
-    // 2. If not found: navigate to /group, return
-    // 3. Generate signed URL for group.gpx_path
-    // 4. Fetch GPX text from signed URL
+    // 1. Supabase에서 id로 그룹 조회
+    // 2. 없으면 /group으로 navigate 후 return
+    // 3. group.gpx_path에 대한 signed URL 생성
+    // 4. signed URL에서 GPX 텍스트 fetch
     // 5. if (!cancelled) store.drawGpxRoute(gpxText)
     if (!cancelled) setGpxLoading(false);
   })();
@@ -216,16 +216,16 @@ useEffect(() => {
 }, [store]);
 ```
 
-The `cancelled` flag prevents a state update on an already-unmounted component.
+`cancelled` 플래그는 이미 언마운트된 컴포넌트에서 상태 업데이트를 방지한다.
 
-4. After `store.initMap(el)` succeeds (`store.map` is set), call `store.drawGpxRoute(gpxText)`
-5. Clean up: `store.clearGpxRoute()` is called inside `store.destroy()`
+4. `store.initMap(el)` 성공 후 (`store.map` 설정됨), `store.drawGpxRoute(gpxText)` 호출
+5. 정리: `store.clearGpxRoute()`는 `store.destroy()` 내부에서 호출됨
 
-Back button navigates to `/group` (not `navigate(-1)`) for predictable behavior regardless of navigation history depth.
+뒤로가기 버튼은 네비게이션 히스토리 깊이와 무관하게 예측 가능한 동작을 위해 `navigate(-1)` 대신 `/group`으로 이동한다.
 
-## Routing
+## 라우팅
 
-Full route tree in `App.tsx` (all group routes are nested under the `ProtectedRoute`/`MainLayout` parent):
+`App.tsx` 전체 라우트 트리 (`ProtectedRoute`/`MainLayout` 부모 아래에 모든 그룹 라우트가 중첩됨):
 
 ```tsx
 <Route
@@ -245,41 +245,41 @@ Full route tree in `App.tsx` (all group routes are nested under the `ProtectedRo
 </Route>
 ```
 
-React Router v6 scores static segments higher than dynamic ones, so `group/new` beats `group/:id` regardless of order. The static route is listed first for clarity.
+React Router v6는 동적 세그먼트보다 정적 세그먼트를 높게 점수 매기므로 순서와 무관하게 `group/new`가 `group/:id`보다 우선한다. 명확성을 위해 정적 라우트를 먼저 나열한다.
 
-## Testing Notes
+## 테스트 노트
 
-- `GroupMapPage.test.tsx` currently tests against `DUMMY_GROUPS` and mocks nothing Supabase-related. After this feature, `GroupMapPage` fetches from Supabase — the test file must be rewritten to mock Supabase calls. Plan for this in the implementation.
-- `GroupStore` and `GroupCreateStore` can be tested by mocking the `supabase` client.
-- `MapStore.drawGpxRoute` / `clearGpxRoute` can be tested by passing GPX XML strings directly (no network needed).
+- `GroupMapPage.test.tsx`는 현재 `DUMMY_GROUPS` 기반으로 테스트하며 Supabase 관련 mock이 없다. 이 기능 구현 후 `GroupMapPage`는 Supabase에서 데이터를 조회하므로 테스트 파일을 Supabase 호출을 mock하도록 전면 재작성해야 한다. 구현 계획에 반영할 것.
+- `GroupStore`, `GroupCreateStore`는 `supabase` 클라이언트를 mock해서 테스트할 수 있다.
+- `MapStore.drawGpxRoute` / `clearGpxRoute`는 GPX XML 문자열을 직접 전달해 테스트할 수 있다 (네트워크 불필요).
 
-## Changed Files
+## 변경 파일
 
-| File | Change |
+| 파일 | 변경 |
 |---|---|
-| `src/types/group.ts` | New — `Group` interface |
-| `src/stores/GroupStore.ts` | New — list fetch |
-| `src/stores/GroupCreateStore.ts` | New — create form + upload |
-| `src/stores/MapStore.ts` | Add `gpxPolyline`, `drawGpxRoute`, `clearGpxRoute`; update `destroy` |
-| `src/pages/GroupPage.tsx` | Replace dummy data with GroupStore, add FAB |
-| `src/pages/GroupCreatePage.tsx` | New — create form UI |
-| `src/pages/GroupMapPage.tsx` | Replace dummy lookup with Supabase fetch + drawGpxRoute; rewrite tests |
-| `src/App.tsx` | Add `group/new` route |
-| `src/data/groups.ts` | Delete |
+| `src/types/group.ts` | 신규 — `Group` 인터페이스 |
+| `src/stores/GroupStore.ts` | 신규 — 목록 조회 |
+| `src/stores/GroupCreateStore.ts` | 신규 — 생성 폼 + 업로드 |
+| `src/stores/MapStore.ts` | `gpxPolyline`, `drawGpxRoute`, `clearGpxRoute` 추가; `destroy` 업데이트 |
+| `src/pages/GroupPage.tsx` | 더미 데이터를 GroupStore로 교체, FAB 추가 |
+| `src/pages/GroupCreatePage.tsx` | 신규 — 생성 폼 UI |
+| `src/pages/GroupMapPage.tsx` | 더미 조회를 Supabase fetch + drawGpxRoute로 교체; 테스트 재작성 |
+| `src/App.tsx` | `group/new` 라우트 추가 |
+| `src/data/groups.ts` | 삭제 |
 
-## Error Handling
+## 에러 처리
 
-| Scenario | Behaviour |
+| 시나리오 | 동작 |
 |---|---|
-| Group list fetch fails | `error = true`, show error message in GroupPage |
-| GPX upload fails | `GroupCreateStore.error` set, toast shown |
-| DB insert fails after upload | Show toast error; GPX file left in Storage (acceptable for now) |
-| Group not found in map view | `<Navigate to="/group" replace />` |
-| GPX fetch fails in map view | `MapStore.error = true`, show existing error overlay |
-| GPX has no trackpoints | `MapStore.error = true`, show existing error overlay |
-| Signed URL expired (60 min) | `MapStore.error = true`, same error overlay shown; user must reload the page |
+| 그룹 목록 조회 실패 | `error = true`, GroupPage에 에러 메시지 표시 |
+| GPX 업로드 실패 | `GroupCreateStore.error` 설정, toast 표시 |
+| 업로드 후 DB 삽입 실패 | toast 에러 표시; GPX 파일은 Storage에 남음 (현재는 허용) |
+| 지도 뷰에서 그룹 없음 | `<Navigate to="/group" replace />` |
+| 지도 뷰에서 GPX fetch 실패 | `MapStore.error = true`, 기존 에러 오버레이 표시 |
+| GPX에 trackpoint 없음 | `MapStore.error = true`, 기존 에러 오버레이 표시 |
+| Signed URL 만료 (60분) | `MapStore.error = true`, 동일한 에러 오버레이 표시; 사용자가 페이지를 새로고침해야 함 |
 
-## Known Limitations
+## 알려진 한계
 
-- Orphaned GPX files if DB insert fails after upload (deferred cleanup)
-- Signed URL expires after 60 minutes; the existing map error overlay is shown on expiry — user must reload the page (acceptable for now)
+- 업로드 후 DB 삽입 실패 시 GPX 파일이 Storage에 남음 (추후 정리)
+- Signed URL은 60분 후 만료; 만료 시 기존 지도 에러 오버레이가 표시됨 — 사용자가 페이지를 새로고침해야 함 (현재는 허용)
