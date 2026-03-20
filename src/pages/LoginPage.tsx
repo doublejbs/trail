@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { observer } from 'mobx-react-lite';
@@ -13,6 +13,8 @@ type Provider = 'google' | 'kakao';
 export const LoginPage = observer(() => {
   const [store] = useState(() => new AuthStore());
   const [loadingProvider, setLoadingProvider] = useState<Provider | null>(null);
+  const [searchParams] = useSearchParams();
+  const next = searchParams.get('next');
 
   useEffect(() => store.initialize(), [store]);
 
@@ -23,11 +25,13 @@ export const LoginPage = observer(() => {
   const handleLogin = async (provider: Provider) => {
     setLoadingProvider(provider);
     try {
+      const redirectTo = next
+        ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+        : `${window.location.origin}/auth/callback`;
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: provider,
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
+        options: { redirectTo },
       });
       if (error) throw error;
     } catch {

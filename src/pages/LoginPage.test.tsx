@@ -19,7 +19,7 @@ vi.mock('../stores/AuthStore', () => ({
 vi.mock('../lib/supabase', () => ({
   supabase: {
     auth: {
-      signInWithOAuth: () => mockSignInWithOAuth(),
+      signInWithOAuth: (...args: unknown[]) => mockSignInWithOAuth(...args),
     },
   },
 }));
@@ -33,6 +33,47 @@ const renderLoginPage = () =>
       </Routes>
     </MemoryRouter>
   );
+
+describe('next param forwarding', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockStore.user = null;
+    mockStore.loading = false;
+  });
+
+  const renderWithNext = (next: string) =>
+    render(
+      <MemoryRouter initialEntries={[`/login?next=${encodeURIComponent(next)}`]}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+  it('구글 로그인 시 next 파라미터를 redirectTo에 포함', async () => {
+    mockSignInWithOAuth.mockResolvedValue({ error: null });
+    renderWithNext('/invite/abc-token');
+    fireEvent.click(screen.getByRole('button', { name: /구글/i }));
+    await waitFor(() => {
+      const call = mockSignInWithOAuth.mock.calls[0][0];
+      expect(call.options.redirectTo).toContain(
+        encodeURIComponent('/invite/abc-token')
+      );
+    });
+  });
+
+  it('next가 없을 때 기본 redirectTo 사용', async () => {
+    mockSignInWithOAuth.mockResolvedValue({ error: null });
+    renderLoginPage();
+    fireEvent.click(screen.getByRole('button', { name: /구글/i }));
+    await waitFor(() => {
+      const call = mockSignInWithOAuth.mock.calls[0][0];
+      expect(call.options.redirectTo).toBe(
+        `${window.location.origin}/auth/callback`
+      );
+    });
+  });
+});
 
 describe('LoginPage', () => {
   beforeEach(() => {
