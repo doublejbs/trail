@@ -54,6 +54,8 @@ group_members (
 ALTER TABLE groups ADD COLUMN max_members INT;
 ```
 
+**Semantics:** `max_members` counts invited members only (rows in `group_members`). The group owner is not stored in `group_members` and does not count against this limit. For example, `max_members = 5` allows 5 invited members in addition to the owner.
+
 ### RLS Policies
 
 | Table | Policy |
@@ -79,13 +81,19 @@ begin
   select * into v_invite from group_invites where token = p_token and is_active = true;
   if not found then return json_build_object('status', 'invalid'); end if;
 
-  -- 2. Already a member?
-  if exists (select 1 from group_members where group_id = v_invite.group_id and user_id = auth.uid()) then
-    select id into v_group from groups where id = v_invite.group_id;
+  -- 2. Owner clicking their own link → treat as already_member
+  select * into v_group from groups where id = v_invite.group_id;
+  if v_group.created_by = auth.uid() then
     return json_build_object('status', 'already_member', 'group_id', v_group.id);
   end if;
 
-  -- 3. Check capacity (lock to avoid race condition)
+  -- 3. Already a member?
+  if exists (select 1 from group_members where group_id = v_invite.group_id and user_id = auth.uid()) then
+    return json_build_object('status', 'already_member', 'group_id', v_group.id);
+  end if;
+
+  -- 4. Check capacity (lock to avoid race condition)
+  -- max_members counts invited members only (owner is not in group_members)
   select * into v_group from groups where id = v_invite.group_id for update;
   if v_group.max_members is not null then
     select count(*) into v_count from group_members where group_id = v_group.id;
@@ -94,7 +102,7 @@ begin
     end if;
   end if;
 
-  -- 4. Insert member
+  -- 5. Insert member
   insert into group_members (group_id, user_id) values (v_group.id, auth.uid());
   return json_build_object('status', 'joined', 'group_id', v_group.id);
 end;
@@ -114,6 +122,10 @@ Called from the client as: `supabase.rpc('join_group_by_token', { p_token: token
 | `/invite/:token` | Public | Validate token, join group, redirect to map |
 | `/group/:id/settings` | Owner only | Manage invite links, members, max member limit |
 
+**`App.tsx` changes required:**
+- `/invite/:token` must be registered as a **top-level public route**, as a sibling to `/login` and `/auth/callback`, outside the `ProtectedRoute` wrapper. It must not be nested under `ProtectedRoute` since unauthenticated users need to reach it before being redirected to login.
+- `/group/:id/settings` must be added inside the existing `ProtectedRoute` group, alongside the existing `/group/:id` route.
+
 ### New Pages
 
 **`InvitePage`** (`/invite/:token`)
@@ -123,7 +135,7 @@ Called from the client as: `supabase.rpc('join_group_by_token', { p_token: token
 - On success: navigates to `/group/:id`.
 
 **`GroupSettingsPage`** (`/group/:id/settings`)
-- Owner-only page (redirect to `/group/:id` if accessed by non-owner).
+- Owner-only page (redirect to `/group/:id` if accessed by non-owner). The client-side redirect is a UX guard; the underlying RLS policies on `group_invites` (owner-only SELECT/INSERT/UPDATE) enforce this at the database level, so non-owners cannot perform settings operations even if they bypass the redirect.
 - Sections:
   - **Invite Link:** Display current active link (or none), button to generate/copy, button to deactivate.
   - **Members:** List of current members with join date.
@@ -141,8 +153,13 @@ Called from the client as: `supabase.rpc('join_group_by_token', { p_token: token
 - Display owned groups and joined groups together, distinguishing with a visual badge (e.g., "소유자" / "멤버").
 
 **`LoginPage`** (`/login`)
-- When a `?next=` query param is present, forward it through the OAuth flow by appending it to the Supabase `redirectTo` URL: `.../auth/callback?next=<encoded_next_value>`.
-- The existing `AuthCallbackPage` already reads `next` from search params and navigates there after session exchange — this change ensures the param survives the OAuth round-trip.
+- Read `?next=` from the current URL's search params using `useSearchParams`.
+- When `next` is present, append it URL-encoded to the Supabase `redirectTo` URL:
+  ```
+  redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+  ```
+- Supabase preserves extra query params on the callback URL. The existing `AuthCallbackPage` already reads `next` from its search params and navigates there after session exchange — this change ensures the param survives the OAuth round-trip.
+- Note: this is a required code change to `LoginPage.tsx`, not yet implemented.
 
 ---
 
