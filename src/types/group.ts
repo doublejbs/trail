@@ -4,4 +4,5 @@ export interface Group {
   created_by: string;
   gpx_path: string;
   created_at: string;
+  max_members: number | null;
 }
