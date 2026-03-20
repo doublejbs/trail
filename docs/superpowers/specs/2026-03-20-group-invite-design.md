@@ -58,8 +58,50 @@ ALTER TABLE groups ADD COLUMN max_members INT;
 
 | Table | Policy |
 |-------|--------|
-| `group_invites` | Group owner can SELECT, INSERT, UPDATE |
-| `group_members` | Group owner can SELECT all rows; member can SELECT their own row; anyone can INSERT their own row when joining via valid token |
+| `group_invites` | Group owner can SELECT, INSERT, UPDATE. No DELETE — deactivation is always a soft-delete (`is_active = false`); tokens are never hard-deleted. |
+| `group_members` | Group owner can SELECT all rows; member can SELECT their own row. INSERT is **not** allowed directly from the client — joining is done exclusively via the `join_group_by_token` RPC (see below). |
+
+### Server-Side RPC: `join_group_by_token`
+
+Token validation, capacity check, and member insertion are performed atomically in a single Postgres function to prevent race conditions (e.g., two users joining simultaneously when one slot remains).
+
+```sql
+-- Pseudo-signature
+create function join_group_by_token(p_token uuid)
+returns json  -- { group_id, status: 'joined' | 'already_member' | 'invalid' | 'full' }
+language plpgsql security definer as $$
+declare
+  v_invite   group_invites;
+  v_group    groups;
+  v_count    int;
+begin
+  -- 1. Validate token
+  select * into v_invite from group_invites where token = p_token and is_active = true;
+  if not found then return json_build_object('status', 'invalid'); end if;
+
+  -- 2. Already a member?
+  if exists (select 1 from group_members where group_id = v_invite.group_id and user_id = auth.uid()) then
+    select id into v_group from groups where id = v_invite.group_id;
+    return json_build_object('status', 'already_member', 'group_id', v_group.id);
+  end if;
+
+  -- 3. Check capacity (lock to avoid race condition)
+  select * into v_group from groups where id = v_invite.group_id for update;
+  if v_group.max_members is not null then
+    select count(*) into v_count from group_members where group_id = v_group.id;
+    if v_count >= v_group.max_members then
+      return json_build_object('status', 'full');
+    end if;
+  end if;
+
+  -- 4. Insert member
+  insert into group_members (group_id, user_id) values (v_group.id, auth.uid());
+  return json_build_object('status', 'joined', 'group_id', v_group.id);
+end;
+$$;
+```
+
+Called from the client as: `supabase.rpc('join_group_by_token', { p_token: token })`
 
 ---
 
@@ -75,10 +117,9 @@ ALTER TABLE groups ADD COLUMN max_members INT;
 ### New Pages
 
 **`InvitePage`** (`/invite/:token`)
-- Validates the token against `group_invites`.
 - If user is not logged in: redirects to `/login?next=/invite/:token`.
 - After login, resumes at `/invite/:token` via the `next` query param.
-- Checks membership status, member limit, and link activity before inserting into `group_members`.
+- Calls `JoinGroupStore.joinByToken(token)`, which invokes the `join_group_by_token` RPC. All validation (token validity, capacity, duplicate membership) happens atomically server-side.
 - On success: navigates to `/group/:id`.
 
 **`GroupSettingsPage`** (`/group/:id/settings`)
@@ -91,12 +132,17 @@ ALTER TABLE groups ADD COLUMN max_members INT;
 ### Modified Pages
 
 **`GroupMapPage`** (`/group/:id`)
+- Ownership is determined by comparing `group.created_by` against the current user's ID from `AuthStore` (or equivalent auth hook).
 - If current user is the group owner: show settings button (⚙️) linking to `/group/:id/settings`.
 - If current user is a member (not owner): hide settings button.
 
 **`GroupPage`** (`/group`)
 - Fetch groups where `created_by = me` OR `group_members.user_id = me`.
 - Display owned groups and joined groups together, distinguishing with a visual badge (e.g., "소유자" / "멤버").
+
+**`LoginPage`** (`/login`)
+- When a `?next=` query param is present, forward it through the OAuth flow by appending it to the Supabase `redirectTo` URL: `.../auth/callback?next=<encoded_next_value>`.
+- The existing `AuthCallbackPage` already reads `next` from search params and navigates there after session exchange — this change ensures the param survives the OAuth round-trip.
 
 ---
 
@@ -124,11 +170,11 @@ Methods:
 **`JoinGroupStore`**
 ```
 Fields:
-  status: 'idle' | 'loading' | 'joining' | 'full' | 'invalid' | 'already_member' | 'success'
+  status: 'idle' | 'loading' | 'full' | 'invalid' | 'already_member' | 'success'
   groupId: string | null
 
 Methods:
-  joinByToken(token)   -- validates token, checks capacity, inserts group_members row
+  joinByToken(token)   -- calls join_group_by_token RPC; sets status and groupId from response
 ```
 
 ### Modified Stores
@@ -138,13 +184,15 @@ Methods:
 
 ---
 
-## New TypeScript Types
+## TypeScript Types
+
+### New Types
 
 ```typescript
 export interface GroupInvite {
   id: string;
   group_id: string;
-  token: string;
+  token: string;        // Only readable by group owner via RLS
   is_active: boolean;
   created_at: string;
 }
@@ -154,6 +202,20 @@ export interface GroupMember {
   group_id: string;
   user_id: string;
   joined_at: string;
+}
+```
+
+### Modified Types
+
+```typescript
+// src/types/group.ts — add max_members field
+export interface Group {
+  id: string;
+  name: string;
+  created_by: string;
+  gpx_path: string;
+  created_at: string;
+  max_members: number | null;   // NEW — null means no limit
 }
 ```
 
