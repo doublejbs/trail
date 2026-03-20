@@ -80,4 +80,18 @@ describe('GroupPage', () => {
       expect(screen.getByText('아직 참여한 그룹이 없습니다')).toBeInTheDocument();
     });
   });
+
+  it('currentUserId가 null이면 "참여중인 그룹"에 모든 그룹이 표시됨', async () => {
+    mockStore.currentUserId = null as unknown as string;
+    mockStore.groups = [
+      { id: 'g1', name: '내 그룹', created_by: 'owner-id', gpx_path: '', created_at: '', max_members: null },
+      { id: 'g2', name: '남의 그룹', created_by: 'other-user', gpx_path: '', created_at: '', max_members: null },
+    ];
+    renderGroupPage();
+    fireEvent.click(screen.getByRole('button', { name: '참여중인 그룹' }));
+    await waitFor(() => {
+      expect(screen.getByText('내 그룹')).toBeInTheDocument();
+      expect(screen.getByText('남의 그룹')).toBeInTheDocument();
+    });
+  });
 });
