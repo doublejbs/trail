@@ -3,7 +3,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { GroupMapPage } from './GroupMapPage';
 
-const { mockStore, mockNavigate, mockFrom, mockCreateSignedUrl } = vi.hoisted(() => ({
+const { mockStore, mockNavigate, mockFrom, mockCreateSignedUrl, mockGetUser } = vi.hoisted(() => ({
   mockStore: {
     map: null as naver.maps.Map | null,
     error: false,
@@ -17,6 +17,7 @@ const { mockStore, mockNavigate, mockFrom, mockCreateSignedUrl } = vi.hoisted(()
   mockNavigate: vi.fn(),
   mockFrom: vi.fn(),
   mockCreateSignedUrl: vi.fn(),
+  mockGetUser: vi.fn(),
 }));
 
 vi.mock('../stores/MapStore', () => ({
@@ -39,6 +40,7 @@ vi.mock('../lib/supabase', () => ({
         createSignedUrl: (...args: unknown[]) => mockCreateSignedUrl(...args),
       }),
     },
+    auth: { getUser: () => mockGetUser() },
   },
 }));
 
@@ -88,6 +90,8 @@ describe('GroupMapPage', () => {
       ok: true,
       text: () => Promise.resolve(FAKE_GPX),
     }));
+
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null });
   });
 
   afterEach(() => {
@@ -149,6 +153,25 @@ describe('GroupMapPage', () => {
     renderAt('/group/group-uuid-1');
     await waitFor(() => {
       expect(mockStore.drawGpxRoute).toHaveBeenCalledWith(FAKE_GPX);
+    });
+  });
+
+  describe('소유자 vs 멤버 UI', () => {
+    it('소유자에게 설정 링크 표시 (created_by 일치)', async () => {
+      // mockGetUser already returns 'user-1', FAKE_GROUP.created_by = 'user-1'
+      renderAt('/group/group-uuid-1');
+      await waitFor(() => {
+        expect(screen.getByRole('link', { name: /설정/i })).toBeInTheDocument();
+      });
+    });
+
+    it('멤버에게 설정 링크 숨김 (created_by 불일치)', async () => {
+      mockGetUser.mockResolvedValue({ data: { user: { id: 'other-user' } }, error: null });
+      renderAt('/group/group-uuid-1');
+      await waitFor(() => {
+        expect(screen.getByTestId('map-container')).toBeInTheDocument();
+      });
+      expect(screen.queryByRole('link', { name: /설정/i })).not.toBeInTheDocument();
     });
   });
 });

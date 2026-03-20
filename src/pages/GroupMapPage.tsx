@@ -15,6 +15,7 @@ export const GroupMapPage = observer(() => {
   const [store] = useState(() => new MapStore());
   const [group, setGroup] = useState<Group | null | undefined>(undefined);
   const [gpxText, setGpxText] = useState<string | null | undefined>(undefined);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Effect 1: Fetch group + GPX (no DOM dependency)
   useEffect(() => {
@@ -36,6 +37,9 @@ export const GroupMapPage = observer(() => {
       }
 
       setGroup(data as Group);
+
+      const { data: userData } = await supabase.auth.getUser();
+      setCurrentUserId(userData?.user?.id ?? null);
 
       // 2. Signed URL 생성
       const { data: urlData, error: urlError } = await supabase.storage
@@ -143,6 +147,19 @@ export const GroupMapPage = observer(() => {
           ← {group.name}
         </button>
       </div>
+
+      {/* 설정 버튼 (소유자 전용) */}
+      {currentUserId && group && currentUserId === group.created_by && (
+        <div className="absolute top-4 right-4">
+          <a
+            href={`/group/${id}/settings`}
+            aria-label="설정"
+            className="bg-white/90 text-black px-3 py-1 rounded-full text-sm font-medium shadow"
+          >
+            ⚙ 설정
+          </a>
+        </div>
+      )}
     </div>
   );
 });
