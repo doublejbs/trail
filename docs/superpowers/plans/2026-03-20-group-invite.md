@@ -780,13 +780,14 @@ describe('GroupInviteStore', () => {
     it('성공 시 groups 테이블 직접 업데이트', async () => {
       mockUpdateGroups.mockResolvedValue({ error: null });
       await store.updateMaxMembers('g1', 10);
-      expect(mockUpdateGroups).toHaveBeenCalledWith({ max_members: 10 }, 'g1');
+      // mock receives spread args: update({ max_members }) then eq('id', groupId)
+      expect(mockUpdateGroups).toHaveBeenCalledWith({ max_members: 10 }, 'id', 'g1');
     });
 
     it('null로 제한 해제 가능', async () => {
       mockUpdateGroups.mockResolvedValue({ error: null });
       await store.updateMaxMembers('g1', null);
-      expect(mockUpdateGroups).toHaveBeenCalledWith({ max_members: null }, 'g1');
+      expect(mockUpdateGroups).toHaveBeenCalledWith({ max_members: null }, 'id', 'g1');
     });
   });
 });
