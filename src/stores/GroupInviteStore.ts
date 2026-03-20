@@ -39,7 +39,9 @@ class GroupInviteStore {
       .eq('group_id', groupId);
 
     runInAction(() => {
-      if (!error) {
+      if (error) {
+        this.error = error.message;
+      } else {
         this.members = data ?? [];
       }
     });
@@ -71,7 +73,9 @@ class GroupInviteStore {
       .eq('id', inviteId);
 
     runInAction(() => {
-      if (!error) {
+      if (error) {
+        this.error = error.message;
+      } else {
         this.invites = this.invites.map((inv) =>
           inv.id === inviteId ? { ...inv, is_active: false } : inv
         );
@@ -88,7 +92,9 @@ class GroupInviteStore {
       .eq('id', groupId);
 
     if (error) {
-      runInAction(() => { this.error = error.message; });
+      runInAction(() => {
+        this.error = error.message;
+      });
     }
   }
 }

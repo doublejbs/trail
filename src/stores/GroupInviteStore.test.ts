@@ -98,6 +98,12 @@ describe('GroupInviteStore', () => {
       await store.fetchMembers('g1');
       expect(store.members).toEqual([FAKE_MEMBER]);
     });
+
+    it('실패 시 error 설정', async () => {
+      mockSelectMembers.mockResolvedValue({ data: null, error: { message: 'fetch error' } });
+      await store.fetchMembers('g1');
+      expect(store.error).toBe('fetch error');
+    });
   });
 
   describe('createInvite()', () => {
@@ -119,6 +125,12 @@ describe('GroupInviteStore', () => {
       store.invites = [FAKE_INVITE];
       await store.deactivateInvite('inv-1');
       expect(store.invites[0].is_active).toBe(false);
+    });
+
+    it('실패 시 error 설정', async () => {
+      mockUpdate.mockResolvedValue({ error: { message: 'update error' } });
+      await store.deactivateInvite('inv-1');
+      expect(store.error).toBe('update error');
     });
   });
 
