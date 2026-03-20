@@ -30,9 +30,31 @@ CREATE TABLE IF NOT EXISTS group_members (
 -- ============================================================
 ALTER TABLE group_invites ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "owner can manage invites"
+CREATE POLICY "owner can select invites"
   ON group_invites
-  FOR SELECT, INSERT, UPDATE
+  FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM groups
+      WHERE groups.id = group_invites.group_id
+        AND groups.created_by = auth.uid()
+    )
+  );
+
+CREATE POLICY "owner can insert invites"
+  ON group_invites
+  FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM groups
+      WHERE groups.id = group_invites.group_id
+        AND groups.created_by = auth.uid()
+    )
+  );
+
+CREATE POLICY "owner can update invites"
+  ON group_invites
+  FOR UPDATE
   USING (
     EXISTS (
       SELECT 1 FROM groups
