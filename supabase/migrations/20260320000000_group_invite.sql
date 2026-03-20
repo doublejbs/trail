@@ -32,7 +32,7 @@ ALTER TABLE group_invites ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "owner can manage invites"
   ON group_invites
-  FOR ALL
+  FOR SELECT, INSERT, UPDATE
   USING (
     EXISTS (
       SELECT 1 FROM groups

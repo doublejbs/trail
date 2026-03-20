@@ -8,7 +8,10 @@ export const AuthCallbackPage = observer(() => {
   const [searchParams] = useSearchParams();
   const [store] = useState(() => new AuthStore());
   const [exchanged, setExchanged] = useState(false);
-  const next = searchParams.get("next") ?? "/";
+  const rawNext = searchParams.get("next");
+  const next = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//")
+    ? rawNext
+    : "/";
 
   // Step 1: exchange the code (once — guard inside AuthStore prevents double-invoke)
   useEffect(() => {
