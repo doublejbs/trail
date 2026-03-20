@@ -62,6 +62,28 @@ ALTER TABLE groups ADD COLUMN max_members INT;
 |-------|--------|
 | `group_invites` | Group owner can SELECT, INSERT, UPDATE. No DELETE — deactivation is always a soft-delete (`is_active = false`); tokens are never hard-deleted. |
 | `group_members` | Group owner can SELECT all rows; member can SELECT their own row. INSERT is **not** allowed directly from the client — joining is done exclusively via the `join_group_by_token` RPC (see below). |
+| `groups` (modified) | Existing policy allows SELECT for `created_by = auth.uid()`. **Add** a second SELECT policy that allows any user who has a row in `group_members` for that group to SELECT it: `EXISTS (SELECT 1 FROM group_members WHERE group_id = groups.id AND user_id = auth.uid())`. |
+
+### Storage Policies (`gpx-files` bucket, modified)
+
+The existing storage policy allows only the file owner to create signed URLs. Add a policy allowing group members to create signed URLs for GPX files belonging to groups they are a member of:
+
+```sql
+-- Allow member to create signed URL for a group's GPX file
+-- Storage path format: {owner_user_id}/{group_id}.gpx
+-- Policy: allow if auth.uid() has a row in group_members for that group_id
+CREATE POLICY "members can read gpx files"
+ON storage.objects FOR SELECT
+USING (
+  bucket_id = 'gpx-files'
+  AND EXISTS (
+    SELECT 1 FROM group_members gm
+    JOIN groups g ON g.id = gm.group_id
+    WHERE gm.user_id = auth.uid()
+      AND g.gpx_path = storage.objects.name
+  )
+);
+```
 
 ### Server-Side RPC: `join_group_by_token`
 
@@ -92,9 +114,10 @@ begin
     return json_build_object('status', 'already_member', 'group_id', v_group.id);
   end if;
 
-  -- 4. Check capacity (lock to avoid race condition)
+  -- 4. Check capacity (advisory lock prevents concurrent joins for the same group)
   -- max_members counts invited members only (owner is not in group_members)
-  select * into v_group from groups where id = v_invite.group_id for update;
+  perform pg_advisory_xact_lock(('x' || md5(v_group.id::text))::bit(64)::bigint);
+  select * into v_group from groups where id = v_invite.group_id;
   if v_group.max_members is not null then
     select count(*) into v_count from group_members where group_id = v_group.id;
     if v_count >= v_group.max_members then
