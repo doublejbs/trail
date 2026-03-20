@@ -4,9 +4,12 @@ import { observer } from 'mobx-react-lite';
 import { Plus } from 'lucide-react';
 import { GroupStore } from '../stores/GroupStore';
 
+type Tab = 'owned' | 'joined';
+
 export const GroupPage = observer(() => {
   const navigate = useNavigate();
   const [store] = useState(() => new GroupStore());
+  const [activeTab, setActiveTab] = useState<Tab>('owned');
 
   useEffect(() => {
     store.load();
@@ -28,29 +31,63 @@ export const GroupPage = observer(() => {
     );
   }
 
+  const ownedGroups = store.groups.filter(
+    (g) => g.created_by === store.currentUserId
+  );
+  const joinedGroups = store.groups.filter(
+    (g) => g.created_by !== store.currentUserId
+  );
+  const visibleGroups = activeTab === 'owned' ? ownedGroups : joinedGroups;
+  const emptyMessage =
+    activeTab === 'owned'
+      ? '아직 만든 그룹이 없습니다'
+      : '아직 참여한 그룹이 없습니다';
+
+  const tabClass = (tab: Tab) =>
+    `flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
+      activeTab === tab
+        ? 'border-black text-black'
+        : 'border-transparent text-neutral-400'
+    }`;
+
   return (
-    <div className="relative h-full overflow-y-auto bg-white">
-      {store.groups.length === 0 ? (
-        <div className="h-full flex items-center justify-center">
-          <p className="text-sm text-neutral-400">아직 그룹이 없습니다</p>
-        </div>
-      ) : (
-        store.groups.map((group) => {
-          const isOwner = store.currentUserId === group.created_by;
-          return (
+    <div className="relative h-full flex flex-col bg-white">
+      {/* Tab bar */}
+      <div className="flex border-b border-neutral-200 shrink-0">
+        <button
+          className={tabClass('owned')}
+          onClick={() => setActiveTab('owned')}
+        >
+          내가 만든 그룹
+        </button>
+        <button
+          className={tabClass('joined')}
+          onClick={() => setActiveTab('joined')}
+        >
+          참여중인 그룹
+        </button>
+      </div>
+
+      {/* Group list */}
+      <div className="flex-1 overflow-y-auto">
+        {visibleGroups.length === 0 ? (
+          <div className="h-full flex items-center justify-center">
+            <p className="text-sm text-neutral-400">{emptyMessage}</p>
+          </div>
+        ) : (
+          visibleGroups.map((group) => (
             <button
               key={group.id}
               onClick={() => navigate(`/group/${group.id}`)}
-              className="w-full px-4 py-4 text-left text-black border-b border-neutral-200 active:bg-neutral-100 flex items-center justify-between"
+              className="w-full px-4 py-4 text-left text-black border-b border-neutral-200 active:bg-neutral-100"
             >
-              <span>{group.name}</span>
-              <span className="text-xs text-neutral-400 ml-2">
-                {isOwner ? '소유자' : '멤버'}
-              </span>
+              {group.name}
             </button>
-          );
-        })
-      )}
+          ))
+        )}
+      </div>
+
+      {/* FAB */}
       <button
         onClick={() => navigate('/group/new')}
         aria-label="그룹 만들기"
