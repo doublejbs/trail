@@ -6,15 +6,21 @@ import { MainLayout } from './pages/MainLayout';
 import { GroupPage } from './pages/GroupPage';
 import { GroupCreatePage } from './pages/GroupCreatePage';
 import { GroupMapPage } from './pages/GroupMapPage';
+import { GroupSettingsPage } from './pages/GroupSettingsPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { InvitePage } from './pages/InvitePage';
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Public routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
+        <Route path="/invite/:token" element={<InvitePage />} />
+
+        {/* Protected routes */}
         <Route
           path="/"
           element={
@@ -27,6 +33,7 @@ export default function App() {
           <Route path="group" element={<GroupPage />} />
           <Route path="group/new" element={<GroupCreatePage />} />
           <Route path="group/:id" element={<GroupMapPage />} />
+          <Route path="group/:id/settings" element={<GroupSettingsPage />} />
           <Route path="history" element={<HistoryPage />} />
           <Route path="profile" element={<ProfilePage />} />
         </Route>
