@@ -1,16 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { observable, runInAction } from 'mobx';
 import { InvitePage } from './InvitePage';
 
-const { mockStore, mockGetSession } = vi.hoisted(() => ({
-  mockStore: {
-    status: 'idle' as string,
-    groupId: null as string | null,
-    joinByToken: vi.fn(),
-  },
+const { mockGetSession } = vi.hoisted(() => ({
   mockGetSession: vi.fn(),
 }));
+
+const mockJoinByToken = vi.fn();
+
+const mockStore = observable(
+  {
+    status: 'idle' as string,
+    groupId: null as string | null,
+    joinByToken: mockJoinByToken,
+  },
+  {
+    joinByToken: false,
+  },
+);
 
 vi.mock('../stores/JoinGroupStore', () => ({
   JoinGroupStore: vi.fn(function () { return mockStore; }),
@@ -37,10 +46,13 @@ const renderInvite = (token = 'test-token') =>
 
 describe('InvitePage', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    mockStore.status = 'idle';
-    mockStore.groupId = null;
-    mockStore.joinByToken.mockResolvedValue(undefined);
+    mockGetSession.mockReset();
+    mockJoinByToken.mockReset();
+    mockJoinByToken.mockResolvedValue(undefined);
+    runInAction(() => {
+      mockStore.status = 'idle';
+      mockStore.groupId = null;
+    });
   });
 
   it('비로그인 상태면 /login?next= 으로 리다이렉트', async () => {
@@ -53,22 +65,26 @@ describe('InvitePage', () => {
 
   it('로그인 상태면 joinByToken 호출', async () => {
     mockGetSession.mockResolvedValue({ data: { session: { user: { id: 'u1' } } } });
-    mockStore.joinByToken.mockImplementation(() => {
-      mockStore.status = 'success';
-      mockStore.groupId = 'g1';
+    mockJoinByToken.mockImplementation(() => {
+      runInAction(() => {
+        mockStore.status = 'success';
+        mockStore.groupId = 'g1';
+      });
       return Promise.resolve();
     });
     renderInvite('abc-123');
     await waitFor(() => {
-      expect(mockStore.joinByToken).toHaveBeenCalledWith('abc-123');
+      expect(mockJoinByToken).toHaveBeenCalledWith('abc-123');
     });
   });
 
   it('success 상태면 /group/:id로 이동', async () => {
     mockGetSession.mockResolvedValue({ data: { session: { user: { id: 'u1' } } } });
-    mockStore.joinByToken.mockImplementation(() => {
-      mockStore.status = 'success';
-      mockStore.groupId = 'g1';
+    mockJoinByToken.mockImplementation(() => {
+      runInAction(() => {
+        mockStore.status = 'success';
+        mockStore.groupId = 'g1';
+      });
       return Promise.resolve();
     });
     renderInvite('abc-123');
@@ -79,9 +95,11 @@ describe('InvitePage', () => {
 
   it('already_member 상태면 /group/:id로 이동', async () => {
     mockGetSession.mockResolvedValue({ data: { session: { user: { id: 'u1' } } } });
-    mockStore.joinByToken.mockImplementation(() => {
-      mockStore.status = 'already_member';
-      mockStore.groupId = 'g1';
+    mockJoinByToken.mockImplementation(() => {
+      runInAction(() => {
+        mockStore.status = 'already_member';
+        mockStore.groupId = 'g1';
+      });
       return Promise.resolve();
     });
     renderInvite('abc-123');
@@ -92,8 +110,10 @@ describe('InvitePage', () => {
 
   it('invalid 상태면 에러 메시지 표시', async () => {
     mockGetSession.mockResolvedValue({ data: { session: { user: { id: 'u1' } } } });
-    mockStore.joinByToken.mockImplementation(() => {
-      mockStore.status = 'invalid';
+    mockJoinByToken.mockImplementation(() => {
+      runInAction(() => {
+        mockStore.status = 'invalid';
+      });
       return Promise.resolve();
     });
     renderInvite('abc-123');
@@ -104,8 +124,10 @@ describe('InvitePage', () => {
 
   it('full 상태면 에러 메시지 표시', async () => {
     mockGetSession.mockResolvedValue({ data: { session: { user: { id: 'u1' } } } });
-    mockStore.joinByToken.mockImplementation(() => {
-      mockStore.status = 'full';
+    mockJoinByToken.mockImplementation(() => {
+      runInAction(() => {
+        mockStore.status = 'full';
+      });
       return Promise.resolve();
     });
     renderInvite('abc-123');

@@ -10,7 +10,6 @@ export const InvitePage = observer(() => {
   const [store] = useState(() => new JoinGroupStore());
   const [sessionChecked, setSessionChecked] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [joinDone, setJoinDone] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -21,17 +20,17 @@ export const InvitePage = observer(() => {
 
   useEffect(() => {
     if (!sessionChecked || !isLoggedIn || !token) return;
-    store.joinByToken(token).then(() => {
-      if (
-        (store.status === 'success' || store.status === 'already_member') &&
-        store.groupId
-      ) {
-        navigate(`/group/${store.groupId}`, { replace: true });
-      } else {
-        setJoinDone(true);
-      }
-    });
-  }, [sessionChecked, isLoggedIn, token, store, navigate]);
+    store.joinByToken(token);
+  }, [sessionChecked, isLoggedIn, token, store]);
+
+  useEffect(() => {
+    if (
+      (store.status === 'success' || store.status === 'already_member') &&
+      store.groupId
+    ) {
+      navigate(`/group/${store.groupId}`, { replace: true });
+    }
+  }, [store.status, store.groupId, navigate]);
 
   if (!sessionChecked) {
     return (
@@ -50,7 +49,7 @@ export const InvitePage = observer(() => {
     );
   }
 
-  if (!joinDone || store.status === 'loading' || store.status === 'idle') {
+  if (store.status === 'loading' || store.status === 'idle') {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin" />
