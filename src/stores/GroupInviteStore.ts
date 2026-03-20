@@ -33,6 +33,9 @@ class GroupInviteStore {
   }
 
   public async fetchMembers(groupId: string): Promise<void> {
+    this.loading = true;
+    this.error = null;
+
     const { data, error } = await supabase
       .from('group_members')
       .select('*')
@@ -44,6 +47,7 @@ class GroupInviteStore {
       } else {
         this.members = data ?? [];
       }
+      this.loading = false;
     });
   }
 

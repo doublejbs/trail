@@ -147,5 +147,11 @@ describe('GroupInviteStore', () => {
       await store.updateMaxMembers('g1', null);
       expect(mockUpdateGroups).toHaveBeenCalledWith({ max_members: null }, 'id', 'g1');
     });
+
+    it('실패 시 error 설정', async () => {
+      mockUpdateGroups.mockResolvedValue({ error: { message: 'update error' } });
+      await store.updateMaxMembers('g1', 10);
+      expect(store.error).toBe('update error');
+    });
   });
 });
