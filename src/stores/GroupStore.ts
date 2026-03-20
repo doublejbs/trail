@@ -6,6 +6,7 @@ class GroupStore {
   public groups: Group[] = [];
   public loading: boolean = true;
   public error: boolean = false;
+  public currentUserId: string | null = null;
 
   public constructor() {
     makeAutoObservable(this);
@@ -15,16 +16,20 @@ class GroupStore {
     this.loading = true;
     this.error = false;
 
-    const { data, error } = await supabase
-      .from('groups')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const [{ data: userData }, { data, error }] = await Promise.all([
+      supabase.auth.getUser(),
+      supabase
+        .from('groups')
+        .select('*')
+        .order('created_at', { ascending: false }),
+    ]);
 
     runInAction(() => {
       if (error) {
         this.error = true;
       } else {
         this.groups = data ?? [];
+        this.currentUserId = userData?.user?.id ?? null;
       }
       this.loading = false;
     });
