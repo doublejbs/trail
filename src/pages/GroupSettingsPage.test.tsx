@@ -57,10 +57,19 @@ describe('GroupSettingsPage', () => {
     mockInviteStore.error = null;
     mockInviteStore.fetchInvites.mockResolvedValue(undefined);
     mockInviteStore.fetchMembers.mockResolvedValue(undefined);
+    mockInviteStore.updateMaxMembers.mockResolvedValue(undefined);
     mockGetUser.mockResolvedValue({ data: { user: { id: OWNER_ID } }, error: null });
     mockGroupSelect.mockResolvedValue({
       data: { id: 'g1', name: '테스트 그룹', created_by: OWNER_ID, gpx_path: 'p', created_at: '', max_members: null },
       error: null,
+    });
+  });
+
+  it('비로그인 상태면 /group/:id로 리다이렉트', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+    renderSettings();
+    await waitFor(() => {
+      expect(screen.getByText('Group Map')).toBeInTheDocument();
     });
   });
 

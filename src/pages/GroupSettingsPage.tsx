@@ -48,7 +48,7 @@ export const GroupSettingsPage = observer(() => {
     return <Navigate to="/group" replace />;
   }
 
-  if (currentUserId && currentUserId !== group.created_by) {
+  if (!currentUserId || currentUserId !== group.created_by) {
     return <Navigate to={`/group/${id}`} replace />;
   }
 
