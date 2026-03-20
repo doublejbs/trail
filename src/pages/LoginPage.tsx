@@ -14,7 +14,10 @@ export const LoginPage = observer(() => {
   const [store] = useState(() => new AuthStore());
   const [loadingProvider, setLoadingProvider] = useState<Provider | null>(null);
   const [searchParams] = useSearchParams();
-  const next = searchParams.get('next');
+  const rawNext = searchParams.get('next');
+  const next = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//')
+    ? rawNext
+    : null;
 
   useEffect(() => store.initialize(), [store]);
 

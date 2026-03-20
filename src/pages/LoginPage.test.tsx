@@ -62,6 +62,18 @@ describe('next param forwarding', () => {
     });
   });
 
+  it('next가 절대 URL일 때 무시하고 기본 redirectTo 사용', async () => {
+    mockSignInWithOAuth.mockResolvedValue({ error: null });
+    renderWithNext('https://evil.com');
+    fireEvent.click(screen.getByRole('button', { name: /구글/i }));
+    await waitFor(() => {
+      const call = mockSignInWithOAuth.mock.calls[0][0];
+      expect(call.options.redirectTo).toBe(
+        `${window.location.origin}/auth/callback`
+      );
+    });
+  });
+
   it('next가 없을 때 기본 redirectTo 사용', async () => {
     mockSignInWithOAuth.mockResolvedValue({ error: null });
     renderLoginPage();
