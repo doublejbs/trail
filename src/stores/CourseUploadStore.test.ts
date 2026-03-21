@@ -66,7 +66,6 @@ describe('CourseUploadStore', () => {
     it('gpxError 있으면 false', async () => {
       store.setName('Route');
       await store.setFile(new File(['bad'], 'r.gpx'));
-      // @ts-expect-error — set error directly for test
       store.gpxError = 'invalid GPX';
       expect(store.isValid).toBe(false);
     });

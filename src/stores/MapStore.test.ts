@@ -316,7 +316,7 @@ describe('MapStore', () => {
     });
 
     it('위치 콜백에서 setCenter 미호출', () => {
-      watchSpy.mockImplementation((cb) => {
+      watchSpy.mockImplementation((cb: (pos: GeolocationPosition) => void) => {
         cb({ coords: { latitude: 37.1, longitude: 127.1 } } as GeolocationPosition);
         return 42;
       });
@@ -327,7 +327,7 @@ describe('MapStore', () => {
     it('위치 콜백에서 Marker 생성', () => {
       const mockLocationMarker = { setMap: vi.fn(), setPosition: vi.fn() };
       mockNaverMaps.Marker.mockImplementation(function () { return mockLocationMarker; });
-      watchSpy.mockImplementation((cb) => {
+      watchSpy.mockImplementation((cb: (pos: GeolocationPosition) => void) => {
         cb({ coords: { latitude: 37.1, longitude: 127.1 } } as GeolocationPosition);
         return 42;
       });
@@ -339,7 +339,7 @@ describe('MapStore', () => {
       const mockLocationMarker = { setMap: vi.fn(), setPosition: vi.fn() };
       mockNaverMaps.Marker.mockImplementation(function () { return mockLocationMarker; });
       let cbRef: ((pos: GeolocationPosition) => void) | null = null;
-      watchSpy.mockImplementation((cb) => {
+      watchSpy.mockImplementation((cb: (pos: GeolocationPosition) => void) => {
         cbRef = cb as (pos: GeolocationPosition) => void;
         cb({ coords: { latitude: 37.1, longitude: 127.1 } } as GeolocationPosition);
         return 42;
@@ -368,7 +368,7 @@ describe('MapStore', () => {
 
     it('clearWatch 호출 + 마커 제거', () => {
       // 위치 콜백으로 마커 먼저 생성
-      watchSpy.mockImplementation((cb) => {
+      watchSpy.mockImplementation((cb: (pos: GeolocationPosition) => void) => {
         cb({ coords: { latitude: 37.1, longitude: 127.1 } } as GeolocationPosition);
         return 42;
       });

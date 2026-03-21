@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,9 +8,8 @@ import { AuthStore } from '../stores/AuthStore';
 import { LoginStore } from '../stores/LoginStore';
 
 export const LoginPage = observer(() => {
-  const navigate = useNavigate();
   const [authStore] = useState(() => new AuthStore());
-  const [store] = useState(() => new LoginStore(navigate));
+  const [store] = useState(() => new LoginStore());
   const [searchParams] = useSearchParams();
   const rawNext = searchParams.get('next');
   const next = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//')

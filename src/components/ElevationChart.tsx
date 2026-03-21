@@ -8,14 +8,14 @@ import {
   ReferenceLine,
   ResponsiveContainer,
 } from 'recharts';
-import type { CategoricalChartState } from 'recharts/types/chart/generateCategoricalChart';
+import type { MouseHandlerDataParam } from 'recharts';
 import { parseGpxCoords, buildElevationProfile } from '../lib/gpx';
 
 interface Props {
   gpxText: string;
 }
 
-export function ElevationChart({ gpxText }: Props): JSX.Element | null {
+export function ElevationChart({ gpxText }: Props) {
   const [activePoint, setActivePoint] = useState<{
     distanceKm: number;
     elevationM: number;
@@ -26,10 +26,10 @@ export function ElevationChart({ gpxText }: Props): JSX.Element | null {
 
   if (!profile) return null;
 
-  const handleMove = (data: CategoricalChartState) => {
-    const payload = data?.activePayload?.[0]?.payload;
-    if (payload) {
-      setActivePoint({ distanceKm: payload.distanceKm, elevationM: payload.elevationM });
+  const handleMove = (data: MouseHandlerDataParam) => {
+    const idx = data?.activeTooltipIndex;
+    if (idx != null && typeof idx === 'number' && profile[idx]) {
+      setActivePoint({ distanceKm: profile[idx].distanceKm, elevationM: profile[idx].elevationM });
     }
   };
 

@@ -3,9 +3,11 @@ import type { NavigateFunction } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
 class AuthCallbackStore {
+  private navigate: NavigateFunction;
   private _exchangeAttempted: boolean = false;
 
-  public constructor(private navigate: NavigateFunction) {
+  public constructor(navigate: NavigateFunction) {
+    this.navigate = navigate;
     makeAutoObservable(this);
   }
 

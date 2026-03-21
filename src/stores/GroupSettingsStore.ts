@@ -5,6 +5,7 @@ import type { Group } from '../types/group';
 import type { GroupInvite, GroupMember } from '../types/invite';
 
 class GroupSettingsStore {
+  private navigate: NavigateFunction;
   public group: Group | null | undefined = undefined;
   public currentUserId: string | null = null;
   public maxInput: string = '';
@@ -12,7 +13,8 @@ class GroupSettingsStore {
   public members: GroupMember[] = [];
   public error: string | null = null;
 
-  public constructor(private navigate: NavigateFunction) {
+  public constructor(navigate: NavigateFunction) {
+    this.navigate = navigate;
     makeAutoObservable(this);
   }
 

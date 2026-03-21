@@ -44,7 +44,7 @@ const MIXED_ELE_GPX = `<?xml version="1.0"?>
 
 describe('parseGpxCoords', () => {
   it('returns coords from valid GPX', () => {
-    const coords = parseGpxCoords(TWO_POINT_GPX);
+    const coords = parseGpxCoords(TWO_POINT_GPX)!;
     expect(coords).toHaveLength(2);
     expect(coords[0]).toEqual({ lat: 37.5, lon: 127.0, ele: 10 });
     expect(coords[1]).toEqual({ lat: 37.501, lon: 127.001, ele: 20 });

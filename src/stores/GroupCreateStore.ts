@@ -4,12 +4,14 @@ import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 
 class GroupCreateStore {
+  private navigate: NavigateFunction;
   public name: string = '';
   public file: File | null = null;
   public submitting: boolean = false;
   public error: string | null = null;
 
-  public constructor(private navigate: NavigateFunction) {
+  public constructor(navigate: NavigateFunction) {
+    this.navigate = navigate;
     makeAutoObservable(this);
   }
 

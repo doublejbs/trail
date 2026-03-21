@@ -4,11 +4,13 @@ import { supabase } from '../lib/supabase';
 import type { Group } from '../types/group';
 
 class GroupMapStore {
+  private navigate: NavigateFunction;
   public group: Group | null | undefined = undefined;
   public gpxText: string | null | undefined = undefined;
   public currentUserId: string | null = null;
 
-  public constructor(private navigate: NavigateFunction) {
+  public constructor(navigate: NavigateFunction) {
+    this.navigate = navigate;
     makeAutoObservable(this);
   }
 

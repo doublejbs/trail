@@ -1,5 +1,4 @@
 import { makeAutoObservable, runInAction } from 'mobx';
-import type { NavigateFunction } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 
@@ -8,7 +7,7 @@ type Provider = 'google' | 'kakao';
 class LoginStore {
   public loadingProvider: Provider | null = null;
 
-  public constructor(private navigate: NavigateFunction) {
+  public constructor() {
     makeAutoObservable(this);
   }
 

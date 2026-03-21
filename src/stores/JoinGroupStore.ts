@@ -5,12 +5,14 @@ import { supabase } from '../lib/supabase';
 type JoinStatus = 'idle' | 'loading' | 'success' | 'already_member' | 'full' | 'invalid';
 
 class JoinGroupStore {
+  private navigate: NavigateFunction;
   public status: JoinStatus = 'idle';
   public groupId: string | null = null;
   public sessionChecked: boolean = false;
   public isLoggedIn: boolean = false;
 
-  public constructor(private navigate: NavigateFunction) {
+  public constructor(navigate: NavigateFunction) {
+    this.navigate = navigate;
     makeAutoObservable(this);
   }
 

@@ -9,7 +9,7 @@ class ResizeObserverStub {
   unobserve = vi.fn();
   disconnect = vi.fn();
 }
-global.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
+(globalThis as Record<string, unknown>).ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
 
 // ResponsiveContainer measures DOM dimensions — jsdom always returns 0,
 // so inject fixed dimensions into the child AreaChart.
@@ -18,7 +18,7 @@ vi.mock('recharts', async () => {
   return {
     ...actual,
     ResponsiveContainer: ({ children }: { children: React.ReactElement }) =>
-      React.cloneElement(children, { width: 400, height: 160 }),
+      React.cloneElement(children as React.ReactElement<{ width?: number; height?: number }>, { width: 400, height: 160 }),
   };
 });
 
