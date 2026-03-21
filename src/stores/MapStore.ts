@@ -111,6 +111,13 @@ class MapStore {
 
     this.map.setCenter(path[0]);
 
+    // 이전 경로/마커 정리 (재호출 시 leak 방지)
+    this.gpxPolyline?.setMap(null);
+    this.startMarker?.setMap(null);
+    this.startMarker = null;
+    this.endMarker?.setMap(null);
+    this.endMarker = null;
+
     // gpxBounds 계산
     const bounds = path.reduce(
       (b, pt) => b.extend(pt),
@@ -127,19 +134,13 @@ class MapStore {
       'idle',
       () => {
         if (!this.map || !this.gpxBounds) return;
-        const mapBounds = this.map.getBounds() as naver.maps.LatLngBounds;
+        const mapBounds = this.map.getBounds();
+        if (!mapBounds || typeof (mapBounds as naver.maps.LatLngBounds).intersects !== 'function') return;
         runInAction(() => {
-          this.isCourseVisible = mapBounds.intersects(this.gpxBounds!);
+          this.isCourseVisible = (mapBounds as naver.maps.LatLngBounds).intersects(this.gpxBounds!);
         });
       },
     );
-
-    // 이전 경로/마커 정리 (재호출 시 leak 방지)
-    this.gpxPolyline?.setMap(null);
-    this.startMarker?.setMap(null);
-    this.startMarker = null;
-    this.endMarker?.setMap(null);
-    this.endMarker = null;
 
     this.gpxPolyline = polyline;
 
