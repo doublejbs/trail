@@ -23,11 +23,16 @@ vi.mock('../lib/supabase', () => ({
   },
 }));
 
+vi.mock('sonner', () => ({
+  toast: { error: vi.fn(), success: vi.fn() },
+}));
+
 const FAKE_USER_ID = 'user-abc-123';
 const FAKE_GROUP_ID = 'group-uuid-456';
 
 describe('GroupCreateStore', () => {
   let store: GroupCreateStore;
+  const mockNavigate = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -35,7 +40,7 @@ describe('GroupCreateStore', () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: FAKE_USER_ID } }, error: null });
     mockUpload.mockResolvedValue({ data: {}, error: null });
     mockInsert.mockResolvedValue({ data: {}, error: null });
-    store = new GroupCreateStore();
+    store = new GroupCreateStore(mockNavigate);
   });
 
   afterEach(() => {
@@ -79,9 +84,9 @@ describe('GroupCreateStore', () => {
       store.setFile(new File(['gpx content'], 'route.gpx'));
     });
 
-    it('성공 시 groupId 반환', async () => {
-      const result = await store.submit();
-      expect(result).toBe(FAKE_GROUP_ID);
+    it('성공 시 navigate("/group") 호출', async () => {
+      await store.submit();
+      expect(mockNavigate).toHaveBeenCalledWith('/group');
     });
 
     it('올바른 경로로 파일 업로드', async () => {
@@ -107,26 +112,26 @@ describe('GroupCreateStore', () => {
       expect(store.submitting).toBe(false);
     });
 
-    it('getUser 실패 시 null 반환 + error 설정 + submitting=false', async () => {
+    it('getUser 실패 시 navigate 미호출 + error 설정 + submitting=false', async () => {
       mockGetUser.mockResolvedValue({ data: { user: null }, error: { message: '인증 오류' } });
-      const result = await store.submit();
-      expect(result).toBeNull();
+      await store.submit();
+      expect(mockNavigate).not.toHaveBeenCalled();
       expect(store.error).toBeTruthy();
       expect(store.submitting).toBe(false);
     });
 
-    it('업로드 실패 시 null 반환 + error 메시지 설정 + submitting=false', async () => {
+    it('업로드 실패 시 navigate 미호출 + error 메시지 설정 + submitting=false', async () => {
       mockUpload.mockResolvedValue({ data: null, error: { message: '업로드 실패' } });
-      const result = await store.submit();
-      expect(result).toBeNull();
+      await store.submit();
+      expect(mockNavigate).not.toHaveBeenCalled();
       expect(store.error).toBe('업로드 실패');
       expect(store.submitting).toBe(false);
     });
 
-    it('DB 삽입 실패 시 null 반환 + error 메시지 설정 + submitting=false', async () => {
+    it('DB 삽입 실패 시 navigate 미호출 + error 메시지 설정 + submitting=false', async () => {
       mockInsert.mockResolvedValue({ data: null, error: { message: 'DB 오류' } });
-      const result = await store.submit();
-      expect(result).toBeNull();
+      await store.submit();
+      expect(mockNavigate).not.toHaveBeenCalled();
       expect(store.error).toBe('DB 오류');
       expect(store.submitting).toBe(false);
     });

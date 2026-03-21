@@ -4,33 +4,22 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { observable, runInAction } from 'mobx';
 import { InvitePage } from './InvitePage';
 
-const { mockGetSession } = vi.hoisted(() => ({
-  mockGetSession: vi.fn(),
-}));
+const mockCheckAndJoin = vi.fn();
+let capturedNavigate: (to: string, opts?: object) => void;
 
-const mockJoinByToken = vi.fn();
-
-const mockStore = observable(
-  {
-    status: 'idle' as string,
-    groupId: null as string | null,
-    joinByToken: mockJoinByToken,
-  },
-  {
-    joinByToken: false,
-  },
-);
+const mockStore = observable({
+  status: 'idle' as string,
+  groupId: null as string | null,
+  sessionChecked: false,
+  isLoggedIn: false,
+  checkAndJoin: mockCheckAndJoin,
+});
 
 vi.mock('../stores/JoinGroupStore', () => ({
-  JoinGroupStore: vi.fn(function () { return mockStore; }),
-}));
-
-vi.mock('../lib/supabase', () => ({
-  supabase: {
-    auth: {
-      getSession: () => mockGetSession(),
-    },
-  },
+  JoinGroupStore: vi.fn(function (navigate: (to: string, opts?: object) => void) {
+    capturedNavigate = navigate;
+    return mockStore;
+  }),
 }));
 
 const renderInvite = (token = 'test-token') =>
@@ -46,46 +35,54 @@ const renderInvite = (token = 'test-token') =>
 
 describe('InvitePage', () => {
   beforeEach(() => {
-    mockGetSession.mockReset();
-    mockJoinByToken.mockReset();
-    mockJoinByToken.mockResolvedValue(undefined);
+    mockCheckAndJoin.mockReset();
+    mockCheckAndJoin.mockResolvedValue(undefined);
     runInAction(() => {
       mockStore.status = 'idle';
       mockStore.groupId = null;
+      mockStore.sessionChecked = false;
+      mockStore.isLoggedIn = false;
     });
   });
 
   it('비로그인 상태면 /login?next= 으로 리다이렉트', async () => {
-    mockGetSession.mockResolvedValue({ data: { session: null } });
+    mockCheckAndJoin.mockImplementation(async () => {
+      runInAction(() => {
+        mockStore.sessionChecked = true;
+        mockStore.isLoggedIn = false;
+      });
+    });
     renderInvite('abc-123');
     await waitFor(() => {
       expect(screen.getByText('Login Page')).toBeInTheDocument();
     });
   });
 
-  it('로그인 상태면 joinByToken 호출', async () => {
-    mockGetSession.mockResolvedValue({ data: { session: { user: { id: 'u1' } } } });
-    mockJoinByToken.mockImplementation(() => {
+  it('로그인 상태면 checkAndJoin 호출', async () => {
+    mockCheckAndJoin.mockImplementation(async () => {
       runInAction(() => {
+        mockStore.sessionChecked = true;
+        mockStore.isLoggedIn = true;
         mockStore.status = 'success';
         mockStore.groupId = 'g1';
       });
-      return Promise.resolve();
+      capturedNavigate(`/group/g1`, { replace: true });
     });
     renderInvite('abc-123');
     await waitFor(() => {
-      expect(mockJoinByToken).toHaveBeenCalledWith('abc-123');
+      expect(mockCheckAndJoin).toHaveBeenCalledWith('abc-123');
     });
   });
 
   it('success 상태면 /group/:id로 이동', async () => {
-    mockGetSession.mockResolvedValue({ data: { session: { user: { id: 'u1' } } } });
-    mockJoinByToken.mockImplementation(() => {
+    mockCheckAndJoin.mockImplementation(async () => {
       runInAction(() => {
+        mockStore.sessionChecked = true;
+        mockStore.isLoggedIn = true;
         mockStore.status = 'success';
         mockStore.groupId = 'g1';
       });
-      return Promise.resolve();
+      capturedNavigate(`/group/g1`, { replace: true });
     });
     renderInvite('abc-123');
     await waitFor(() => {
@@ -94,13 +91,14 @@ describe('InvitePage', () => {
   });
 
   it('already_member 상태면 /group/:id로 이동', async () => {
-    mockGetSession.mockResolvedValue({ data: { session: { user: { id: 'u1' } } } });
-    mockJoinByToken.mockImplementation(() => {
+    mockCheckAndJoin.mockImplementation(async () => {
       runInAction(() => {
+        mockStore.sessionChecked = true;
+        mockStore.isLoggedIn = true;
         mockStore.status = 'already_member';
         mockStore.groupId = 'g1';
       });
-      return Promise.resolve();
+      capturedNavigate(`/group/g1`, { replace: true });
     });
     renderInvite('abc-123');
     await waitFor(() => {
@@ -109,12 +107,12 @@ describe('InvitePage', () => {
   });
 
   it('invalid 상태면 에러 메시지 표시', async () => {
-    mockGetSession.mockResolvedValue({ data: { session: { user: { id: 'u1' } } } });
-    mockJoinByToken.mockImplementation(() => {
+    mockCheckAndJoin.mockImplementation(async () => {
       runInAction(() => {
+        mockStore.sessionChecked = true;
+        mockStore.isLoggedIn = true;
         mockStore.status = 'invalid';
       });
-      return Promise.resolve();
     });
     renderInvite('abc-123');
     await waitFor(() => {
@@ -123,12 +121,12 @@ describe('InvitePage', () => {
   });
 
   it('full 상태면 에러 메시지 표시', async () => {
-    mockGetSession.mockResolvedValue({ data: { session: { user: { id: 'u1' } } } });
-    mockJoinByToken.mockImplementation(() => {
+    mockCheckAndJoin.mockImplementation(async () => {
       runInAction(() => {
+        mockStore.sessionChecked = true;
+        mockStore.isLoggedIn = true;
         mockStore.status = 'full';
       });
-      return Promise.resolve();
     });
     renderInvite('abc-123');
     await waitFor(() => {

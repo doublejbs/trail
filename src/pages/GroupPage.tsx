@@ -4,12 +4,9 @@ import { observer } from 'mobx-react-lite';
 import { Plus } from 'lucide-react';
 import { GroupStore } from '../stores/GroupStore';
 
-type Tab = 'owned' | 'joined';
-
 export const GroupPage = observer(() => {
   const navigate = useNavigate();
   const [store] = useState(() => new GroupStore());
-  const [activeTab, setActiveTab] = useState<Tab>('owned');
 
   useEffect(() => {
     store.load();
@@ -37,15 +34,15 @@ export const GroupPage = observer(() => {
   const joinedGroups = store.groups.filter(
     (g) => g.created_by !== store.currentUserId
   );
-  const visibleGroups = activeTab === 'owned' ? ownedGroups : joinedGroups;
+  const visibleGroups = store.activeTab === 'owned' ? ownedGroups : joinedGroups;
   const emptyMessage =
-    activeTab === 'owned'
+    store.activeTab === 'owned'
       ? '아직 만든 그룹이 없습니다'
       : '아직 참여한 그룹이 없습니다';
 
-  const tabClass = (tab: Tab) =>
+  const tabClass = (tab: 'owned' | 'joined') =>
     `flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
-      activeTab === tab
+      store.activeTab === tab
         ? 'border-black text-black'
         : 'border-transparent text-neutral-400'
     }`;
@@ -56,13 +53,13 @@ export const GroupPage = observer(() => {
       <div className="flex border-b border-neutral-200 shrink-0">
         <button
           className={tabClass('owned')}
-          onClick={() => setActiveTab('owned')}
+          onClick={() => store.setActiveTab('owned')}
         >
           내가 만든 그룹
         </button>
         <button
           className={tabClass('joined')}
-          onClick={() => setActiveTab('joined')}
+          onClick={() => store.setActiveTab('joined')}
         >
           참여중인 그룹
         </button>

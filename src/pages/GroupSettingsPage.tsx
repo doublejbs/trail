@@ -3,40 +3,18 @@ import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { supabase } from '../lib/supabase';
-import { GroupInviteStore } from '../stores/GroupInviteStore';
-import type { Group } from '../types/group';
+import { GroupSettingsStore } from '../stores/GroupSettingsStore';
 
 export const GroupSettingsPage = observer(() => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [store] = useState(() => new GroupInviteStore());
-  const [group, setGroup] = useState<Group | null | undefined>(undefined);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [maxInput, setMaxInput] = useState<string>('');
+  const [store] = useState(() => new GroupSettingsStore(navigate));
 
   useEffect(() => {
-    if (!id) return;
-
-    (async () => {
-      const [{ data: userData }, { data: groupData }] = await Promise.all([
-        supabase.auth.getUser(),
-        supabase.from('groups').select('*').eq('id', id).single(),
-      ]);
-
-      const userId = userData?.user?.id ?? null;
-      setCurrentUserId(userId);
-      setGroup(groupData as Group | null ?? null);
-
-      if (groupData && userId === (groupData as Group).created_by) {
-        setMaxInput((groupData as Group).max_members?.toString() ?? '');
-        store.fetchInvites(id);
-        store.fetchMembers(id);
-      }
-    })();
+    if (id) store.load(id);
   }, [id, store]);
 
-  if (group === undefined) {
+  if (store.group === undefined) {
     return (
       <div className="flex h-full items-center justify-center bg-white">
         <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin" />
@@ -44,11 +22,11 @@ export const GroupSettingsPage = observer(() => {
     );
   }
 
-  if (group === null || !id) {
+  if (store.group === null || !id) {
     return <Navigate to="/group" replace />;
   }
 
-  if (!currentUserId || currentUserId !== group.created_by) {
+  if (!store.currentUserId || store.currentUserId !== store.group.created_by) {
     return <Navigate to={`/group/${id}`} replace />;
   }
 
@@ -64,8 +42,8 @@ export const GroupSettingsPage = observer(() => {
   };
 
   const handleSaveMax = async () => {
-    const parsed = maxInput === '' ? null : parseInt(maxInput, 10);
-    if (maxInput !== '' && (isNaN(parsed!) || parsed! < 1)) {
+    const parsed = store.maxInput === '' ? null : parseInt(store.maxInput, 10);
+    if (store.maxInput !== '' && (isNaN(parsed!) || parsed! < 1)) {
       toast.error('올바른 숫자를 입력해주세요');
       return;
     }
@@ -73,8 +51,6 @@ export const GroupSettingsPage = observer(() => {
     if (!store.error) toast.success('저장됐습니다');
   };
 
-  // GroupSettingsPage is rendered inside MainLayout (which shows a bottom tab bar).
-  // Use `absolute inset-0` to cover the layout chrome — same pattern as GroupMapPage.
   return (
     <div className="absolute inset-0 overflow-y-auto bg-white">
       {/* Header */}
@@ -85,7 +61,7 @@ export const GroupSettingsPage = observer(() => {
         >
           ←
         </button>
-        <h1 className="text-base font-semibold">{group.name} 설정</h1>
+        <h1 className="text-base font-semibold">{store.group.name} 설정</h1>
       </div>
 
       <div className="px-4 py-6 flex flex-col gap-8">
@@ -130,8 +106,8 @@ export const GroupSettingsPage = observer(() => {
               type="number"
               min={1}
               placeholder="제한 없음"
-              value={maxInput}
-              onChange={(e) => setMaxInput(e.target.value)}
+              value={store.maxInput}
+              onChange={(e) => store.setMaxInput(e.target.value)}
               className="border border-neutral-300 rounded px-3 py-1.5 text-sm w-32"
             />
             <Button size="sm" onClick={handleSaveMax}>저장</Button>

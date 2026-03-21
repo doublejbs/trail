@@ -1,17 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { observable, action } from 'mobx';
 import { GroupPage } from './GroupPage';
 
-const { mockStore } = vi.hoisted(() => ({
-  mockStore: {
-    groups: [] as { id: string; name: string; created_by: string; gpx_path: string; created_at: string; max_members: null }[],
-    loading: false,
-    error: false,
-    currentUserId: 'owner-id',
-    load: vi.fn(),
-  },
-}));
+type Group = { id: string; name: string; created_by: string; gpx_path: string; created_at: string; max_members: null };
+
+const mockLoad = vi.fn();
+
+const mockStore = observable({
+  groups: [] as Group[],
+  loading: false,
+  error: false,
+  currentUserId: 'owner-id' as string | null,
+  activeTab: 'owned' as 'owned' | 'joined',
+  load: mockLoad,
+  setActiveTab: action(function (tab: 'owned' | 'joined') {
+    mockStore.activeTab = tab;
+  }),
+});
 
 vi.mock('../stores/GroupStore', () => ({
   GroupStore: vi.fn(function () { return mockStore; }),
@@ -33,6 +40,7 @@ describe('GroupPage', () => {
     mockStore.error = false;
     mockStore.currentUserId = 'owner-id';
     mockStore.groups = [];
+    mockStore.activeTab = 'owned';
   });
 
   it('기본 탭은 "내가 만든 그룹"', () => {
@@ -82,7 +90,7 @@ describe('GroupPage', () => {
   });
 
   it('currentUserId가 null이면 "참여중인 그룹"에 모든 그룹이 표시됨', async () => {
-    mockStore.currentUserId = null as unknown as string;
+    mockStore.currentUserId = null;
     mockStore.groups = [
       { id: 'g1', name: '내 그룹', created_by: 'owner-id', gpx_path: '', created_at: '', max_members: null },
       { id: 'g2', name: '남의 그룹', created_by: 'other-user', gpx_path: '', created_at: '', max_members: null },

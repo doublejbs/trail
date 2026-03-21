@@ -1,38 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
-import { supabase } from '../lib/supabase';
 import { JoinGroupStore } from '../stores/JoinGroupStore';
 
 export const InvitePage = observer(() => {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
-  const [store] = useState(() => new JoinGroupStore());
-  const [sessionChecked, setSessionChecked] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [store] = useState(() => new JoinGroupStore(navigate));
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setIsLoggedIn(!!session);
-      setSessionChecked(true);
-    });
-  }, []);
+    if (token) store.checkAndJoin(token);
+  }, [store, token]);
 
-  useEffect(() => {
-    if (!sessionChecked || !isLoggedIn || !token) return;
-    store.joinByToken(token);
-  }, [sessionChecked, isLoggedIn, token, store]);
-
-  useEffect(() => {
-    if (
-      (store.status === 'success' || store.status === 'already_member') &&
-      store.groupId
-    ) {
-      navigate(`/group/${store.groupId}`, { replace: true });
-    }
-  }, [store.status, store.groupId, navigate]);
-
-  if (!sessionChecked) {
+  if (!store.sessionChecked) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin" />
@@ -40,7 +20,7 @@ export const InvitePage = observer(() => {
     );
   }
 
-  if (!isLoggedIn) {
+  if (!store.isLoggedIn) {
     return (
       <Navigate
         to={`/login?next=${encodeURIComponent(`/invite/${token}`)}`}

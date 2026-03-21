@@ -1,0 +1,26 @@
+import { makeAutoObservable } from 'mobx';
+import type { NavigateFunction } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+
+class AuthCallbackStore {
+  private _exchangeAttempted: boolean = false;
+
+  public constructor(private navigate: NavigateFunction) {
+    makeAutoObservable(this);
+  }
+
+  public async handleCallback(code: string | null, next: string): Promise<void> {
+    if (!code) {
+      this.navigate('/login', { replace: true });
+      return;
+    }
+    if (this._exchangeAttempted) return;
+    this._exchangeAttempted = true;
+
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    const success = !error && !!data.session;
+    this.navigate(success ? next : '/login', { replace: true });
+  }
+}
+
+export { AuthCallbackStore };

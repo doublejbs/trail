@@ -2,40 +2,37 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { GroupSettingsPage } from './GroupSettingsPage';
+import type { Group } from '../types/group';
 
 const OWNER_ID = 'owner-user-id';
 
-const { mockInviteStore, mockGetUser, mockGroupSelect } = vi.hoisted(() => ({
-  mockInviteStore: {
+const FAKE_GROUP: Group = {
+  id: 'g1',
+  name: '테스트 그룹',
+  created_by: OWNER_ID,
+  gpx_path: 'path/to/file.gpx',
+  created_at: '',
+  max_members: null,
+};
+
+const { mockStore } = vi.hoisted(() => ({
+  mockStore: {
+    group: undefined as Group | null | undefined,
+    currentUserId: null as string | null,
+    maxInput: '',
     invites: [] as { id: string; group_id: string; token: string; is_active: boolean; created_at: string }[],
     members: [] as { id: string; group_id: string; user_id: string; joined_at: string }[],
-    loading: false,
     error: null as string | null,
-    fetchInvites: vi.fn(),
-    fetchMembers: vi.fn(),
+    load: vi.fn(),
+    setMaxInput: vi.fn(),
     createInvite: vi.fn(),
     deactivateInvite: vi.fn(),
     updateMaxMembers: vi.fn(),
   },
-  mockGetUser: vi.fn(),
-  mockGroupSelect: vi.fn(),
 }));
 
-vi.mock('../stores/GroupInviteStore', () => ({
-  GroupInviteStore: vi.fn(function () { return mockInviteStore; }),
-}));
-
-vi.mock('../lib/supabase', () => ({
-  supabase: {
-    auth: { getUser: () => mockGetUser() },
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          single: () => mockGroupSelect(),
-        }),
-      }),
-    }),
-  },
+vi.mock('../stores/GroupSettingsStore', () => ({
+  GroupSettingsStore: vi.fn(function () { return mockStore; }),
 }));
 
 const renderSettings = (groupId = 'g1') =>
@@ -44,6 +41,7 @@ const renderSettings = (groupId = 'g1') =>
       <Routes>
         <Route path="/group/:id/settings" element={<GroupSettingsPage />} />
         <Route path="/group/:id" element={<div>Group Map</div>} />
+        <Route path="/group" element={<div>Group List</div>} />
       </Routes>
     </MemoryRouter>
   );
@@ -51,22 +49,26 @@ const renderSettings = (groupId = 'g1') =>
 describe('GroupSettingsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockInviteStore.invites = [];
-    mockInviteStore.members = [];
-    mockInviteStore.loading = false;
-    mockInviteStore.error = null;
-    mockInviteStore.fetchInvites.mockResolvedValue(undefined);
-    mockInviteStore.fetchMembers.mockResolvedValue(undefined);
-    mockInviteStore.updateMaxMembers.mockResolvedValue(undefined);
-    mockGetUser.mockResolvedValue({ data: { user: { id: OWNER_ID } }, error: null });
-    mockGroupSelect.mockResolvedValue({
-      data: { id: 'g1', name: '테스트 그룹', created_by: OWNER_ID, gpx_path: 'p', created_at: '', max_members: null },
-      error: null,
-    });
+    mockStore.group = FAKE_GROUP;
+    mockStore.currentUserId = OWNER_ID;
+    mockStore.maxInput = '';
+    mockStore.invites = [];
+    mockStore.members = [];
+    mockStore.error = null;
+    mockStore.load.mockResolvedValue(undefined);
+    mockStore.createInvite.mockResolvedValue(undefined);
+    mockStore.deactivateInvite.mockResolvedValue(undefined);
+    mockStore.updateMaxMembers.mockResolvedValue(undefined);
+  });
+
+  it('로딩 중에는 스피너 표시', () => {
+    mockStore.group = undefined;
+    renderSettings();
+    expect(document.querySelector('.animate-spin')).toBeTruthy();
   });
 
   it('비로그인 상태면 /group/:id로 리다이렉트', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+    mockStore.currentUserId = null;
     renderSettings();
     await waitFor(() => {
       expect(screen.getByText('Group Map')).toBeInTheDocument();
@@ -74,7 +76,7 @@ describe('GroupSettingsPage', () => {
   });
 
   it('소유자가 아닌 경우 /group/:id로 리다이렉트', async () => {
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'other-user' } }, error: null });
+    mockStore.currentUserId = 'other-user';
     renderSettings();
     await waitFor(() => {
       expect(screen.getByText('Group Map')).toBeInTheDocument();
@@ -100,12 +102,12 @@ describe('GroupSettingsPage', () => {
     await waitFor(() => screen.getByRole('button', { name: /링크 생성/i }));
     fireEvent.click(screen.getByRole('button', { name: /링크 생성/i }));
     await waitFor(() => {
-      expect(mockInviteStore.createInvite).toHaveBeenCalledWith('g1');
+      expect(mockStore.createInvite).toHaveBeenCalledWith('g1');
     });
   });
 
   it('활성 초대 링크가 있으면 비활성화 버튼 표시', async () => {
-    mockInviteStore.invites = [
+    mockStore.invites = [
       { id: 'inv-1', group_id: 'g1', token: 'tok-abc', is_active: true, created_at: '' },
     ];
     renderSettings();
@@ -115,19 +117,19 @@ describe('GroupSettingsPage', () => {
   });
 
   it('비활성화 버튼 클릭 시 deactivateInvite 호출', async () => {
-    mockInviteStore.invites = [
+    mockStore.invites = [
       { id: 'inv-1', group_id: 'g1', token: 'tok-abc', is_active: true, created_at: '' },
     ];
     renderSettings();
     await waitFor(() => screen.getByRole('button', { name: /비활성화/i }));
     fireEvent.click(screen.getByRole('button', { name: /비활성화/i }));
     await waitFor(() => {
-      expect(mockInviteStore.deactivateInvite).toHaveBeenCalledWith('inv-1');
+      expect(mockStore.deactivateInvite).toHaveBeenCalledWith('inv-1');
     });
   });
 
   it('멤버 목록 렌더링', async () => {
-    mockInviteStore.members = [
+    mockStore.members = [
       { id: 'm1', group_id: 'g1', user_id: 'u2', joined_at: '2026-01-02T00:00:00Z' },
     ];
     renderSettings();

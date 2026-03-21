@@ -1,49 +1,34 @@
 import { useState, useEffect } from 'react';
-import { Navigate, useSearchParams } from 'react-router-dom';
-import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
+import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { supabase } from '../lib/supabase';
 import { AuthStore } from '../stores/AuthStore';
-
-type Provider = 'google' | 'kakao';
+import { LoginStore } from '../stores/LoginStore';
 
 export const LoginPage = observer(() => {
-  const [store] = useState(() => new AuthStore());
-  const [loadingProvider, setLoadingProvider] = useState<Provider | null>(null);
+  const navigate = useNavigate();
+  const [authStore] = useState(() => new AuthStore());
+  const [store] = useState(() => new LoginStore(navigate));
   const [searchParams] = useSearchParams();
   const rawNext = searchParams.get('next');
   const next = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//')
     ? rawNext
     : null;
 
-  useEffect(() => store.initialize(), [store]);
+  useEffect(() => authStore.initialize(), [authStore]);
 
-  if (!store.loading && store.user) {
+  if (!authStore.loading && authStore.user) {
     return <Navigate to="/" replace />;
   }
 
-  const handleLogin = async (provider: Provider) => {
-    setLoadingProvider(provider);
-    try {
-      const redirectTo = next
-        ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
-        : `${window.location.origin}/auth/callback`;
-
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: provider,
-        options: { redirectTo },
-      });
-      if (error) throw error;
-    } catch {
-      toast.error('잠시 후 다시 시도해주세요');
-      setLoadingProvider(null);
-    }
+  const handleLogin = (provider: 'google' | 'kakao') => {
+    const redirectTo = next
+      ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+      : `${window.location.origin}/auth/callback`;
+    store.login(provider, redirectTo);
   };
-
-  const isLoading = loadingProvider !== null;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-white px-4">
@@ -57,10 +42,10 @@ export const LoginPage = observer(() => {
             variant="outline"
             className="w-full gap-2 border-neutral-300 bg-white text-black hover:bg-neutral-50"
             onClick={() => handleLogin('google')}
-            disabled={isLoading}
+            disabled={store.isLoading}
             aria-label="구글로 로그인"
           >
-            {loadingProvider === 'google' ? (
+            {store.loadingProvider === 'google' ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <GoogleIcon />
@@ -70,10 +55,10 @@ export const LoginPage = observer(() => {
           <Button
             className="w-full gap-2 bg-[#FEE500] text-black hover:bg-[#F5DC00] border-0"
             onClick={() => handleLogin('kakao')}
-            disabled={isLoading}
+            disabled={store.isLoading}
             aria-label="카카오로 로그인"
           >
-            {loadingProvider === 'kakao' ? (
+            {store.loadingProvider === 'kakao' ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <KakaoIcon />

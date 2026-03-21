@@ -1,4 +1,6 @@
 import { makeAutoObservable, runInAction } from 'mobx';
+import type { NavigateFunction } from 'react-router-dom';
+import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 
 class GroupCreateStore {
@@ -7,7 +9,7 @@ class GroupCreateStore {
   public submitting: boolean = false;
   public error: string | null = null;
 
-  public constructor() {
+  public constructor(private navigate: NavigateFunction) {
     makeAutoObservable(this);
   }
 
@@ -23,9 +25,11 @@ class GroupCreateStore {
     return this.name.trim() !== '' && this.file !== null;
   }
 
-  public async submit(): Promise<string | null> {
-    this.submitting = true;
-    this.error = null;
+  public async submit(): Promise<void> {
+    runInAction(() => {
+      this.submitting = true;
+      this.error = null;
+    });
 
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData.user) {
@@ -33,7 +37,8 @@ class GroupCreateStore {
         this.error = '인증 오류가 발생했습니다';
         this.submitting = false;
       });
-      return null;
+      toast.error(this.error!);
+      return;
     }
 
     const userId = userData.user.id;
@@ -49,7 +54,8 @@ class GroupCreateStore {
         this.error = uploadError.message;
         this.submitting = false;
       });
-      return null;
+      toast.error(this.error!);
+      return;
     }
 
     const { error: insertError } = await supabase
@@ -61,13 +67,12 @@ class GroupCreateStore {
         this.error = insertError.message;
         this.submitting = false;
       });
-      return null;
+      toast.error(this.error!);
+      return;
     }
 
-    runInAction(() => {
-      this.submitting = false;
-    });
-    return groupId;
+    runInAction(() => { this.submitting = false; });
+    this.navigate('/group');
   }
 }
 

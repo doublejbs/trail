@@ -2,14 +2,21 @@ import { makeAutoObservable, runInAction } from 'mobx';
 import { supabase } from '../lib/supabase';
 import type { Group } from '../types/group';
 
+type Tab = 'owned' | 'joined';
+
 class GroupStore {
   public groups: Group[] = [];
   public loading: boolean = true;
   public error: boolean = false;
   public currentUserId: string | null = null;
+  public activeTab: Tab = 'owned';
 
   public constructor() {
     makeAutoObservable(this);
+  }
+
+  public setActiveTab(tab: Tab): void {
+    this.activeTab = tab;
   }
 
   public async load(): Promise<void> {
