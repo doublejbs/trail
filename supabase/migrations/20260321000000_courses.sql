@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS courses (
   created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX ON courses (is_public, created_at DESC);
+CREATE INDEX IF NOT EXISTS courses_is_public_created_at_idx ON courses (is_public, created_at DESC);
 
 -- ============================================================
 -- 2. course_likes table
@@ -47,6 +47,11 @@ CREATE TABLE IF NOT EXISTS course_comments (
 -- ============================================================
 ALTER TABLE courses ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "public courses are readable" ON courses;
+DROP POLICY IF EXISTS "owner can insert courses" ON courses;
+DROP POLICY IF EXISTS "owner can update courses" ON courses;
+DROP POLICY IF EXISTS "owner can delete courses" ON courses;
+
 CREATE POLICY "public courses are readable"
   ON courses FOR SELECT
   USING (is_public = true OR created_by = auth.uid());
@@ -68,6 +73,10 @@ CREATE POLICY "owner can delete courses"
 -- 5. RLS: course_likes
 -- ============================================================
 ALTER TABLE course_likes ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "likes readable for accessible courses" ON course_likes;
+DROP POLICY IF EXISTS "user can insert own like" ON course_likes;
+DROP POLICY IF EXISTS "user can delete own like" ON course_likes;
 
 CREATE POLICY "likes readable for accessible courses"
   ON course_likes FOR SELECT
@@ -92,6 +101,10 @@ CREATE POLICY "user can delete own like"
 -- ============================================================
 ALTER TABLE course_comments ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "comments readable for accessible courses" ON course_comments;
+DROP POLICY IF EXISTS "user can insert own comment" ON course_comments;
+DROP POLICY IF EXISTS "user can delete own comment" ON course_comments;
+
 CREATE POLICY "comments readable for accessible courses"
   ON course_comments FOR SELECT
   USING (
@@ -115,6 +128,10 @@ CREATE POLICY "user can delete own comment"
 -- Note: create bucket "course-gpx" with public=false in Supabase dashboard first.
 -- Then apply these storage policies via Supabase dashboard or SQL editor:
 -- ============================================================
+DROP POLICY IF EXISTS "authenticated users can read course gpx" ON storage.objects;
+DROP POLICY IF EXISTS "user can upload own course gpx" ON storage.objects;
+DROP POLICY IF EXISTS "user can delete own course gpx" ON storage.objects;
+
 -- SELECT: authenticated users can read any object
 CREATE POLICY "authenticated users can read course gpx"
   ON storage.objects FOR SELECT
