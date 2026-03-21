@@ -82,7 +82,7 @@ export function ElevationChart({ gpxText }: Props): JSX.Element | null
 
 Implemented with a `useState` holding `{ distanceKm: number; elevationM: number } | null`. Updated by recharts `onMouseMove(data)` where `data.activePayload?.[0]?.payload` gives the `ElevationPoint`. Cleared on `onMouseLeave`.
 
-For touch: use `onTouchMove` on the wrapping div to call the same handler via recharts' `getEventCoordinates`.
+For touch: use `onTouchMove` directly on `AreaChart` (recharts supports it as a prop alongside `onMouseMove`). Both callbacks receive the same `CategoricalChartState` object and provide `data.activePayload?.[0]?.payload`. Clear on `onMouseLeave` and `onTouchEnd`.
 
 ### No-data state
 
@@ -94,19 +94,25 @@ Component returns `null` — the caller (`CourseDetailPage`) simply omits the se
 
 **File:** `src/pages/CourseDetailPage.tsx`
 
-`ElevationChart` is inserted in the scrollable detail section, between the stats row and the like button:
+`ElevationChart` is inserted as a new `<div>` block immediately after the stats `<div>` block (which has `border-b border-neutral-100`) and before the like `<div>` block. It gets its own `border-b border-neutral-100` separator:
 
 ```
-코스명
-거리 · 고도 수치 (existing stats)
-[ ElevationChart ]    ← inserted here, only when gpxText is a non-null string
-────────────────────
-♥ 좋아요
-────────────────────
-댓글
+<div className="px-4 pt-4 pb-3 border-b border-neutral-100">  {/* stats */}
+  ...
+</div>
+
+{typeof gpxText === 'string' && (
+  <div className="border-b border-neutral-100">
+    <ElevationChart gpxText={gpxText} />
+  </div>
+)}
+
+<div className="flex items-center gap-2 px-4 py-3 border-b border-neutral-100">  {/* like */}
+  ...
+</div>
 ```
 
-Condition: `{typeof gpxText === 'string' && <ElevationChart gpxText={gpxText} />}`
+The `XAxis` uses `dataKey="distanceKm"` and `ReferenceLine` uses `<ReferenceLine x={activePoint.distanceKm} stroke="#FF5722" />` to correctly align the cursor with the distance axis.
 
 No changes to `CourseDetailStore`.
 
