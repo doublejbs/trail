@@ -48,38 +48,45 @@ class CourseDetailStore {
       return;
     }
 
-    // Fetch like count
-    const { count: likeCount } = await supabase
-      .from('course_likes')
-      .select('*', { count: 'exact', head: true })
-      .eq('course_id', this.courseId);
-
-    // Fetch user's own like
-    let userHasLiked = false;
-    if (uid) {
-      const { data: myLike } = await supabase
+    try {
+      // Fetch like count
+      const { count: likeCount } = await supabase
         .from('course_likes')
-        .select('user_id')
+        .select('*', { count: 'exact', head: true })
+        .eq('course_id', this.courseId);
+
+      // Fetch user's own like
+      let userHasLiked = false;
+      if (uid) {
+        const { data: myLike } = await supabase
+          .from('course_likes')
+          .select('user_id')
+          .eq('course_id', this.courseId)
+          .eq('user_id', uid)
+          .single();
+        userHasLiked = !!myLike;
+      }
+
+      // Fetch comments
+      const { data: comments } = await supabase
+        .from('course_comments')
+        .select('*')
         .eq('course_id', this.courseId)
-        .eq('user_id', uid)
-        .single();
-      userHasLiked = !!myLike;
+        .order('created_at', { ascending: false });
+
+      runInAction(() => {
+        this.course = data as Course;
+        this.likeCount = likeCount ?? 0;
+        this.userHasLiked = userHasLiked;
+        this.comments = (comments ?? []) as CourseComment[];
+        this.loading = false;
+      });
+    } catch {
+      runInAction(() => {
+        this.error = '데이터를 불러올 수 없습니다';
+        this.loading = false;
+      });
     }
-
-    // Fetch comments
-    const { data: comments } = await supabase
-      .from('course_comments')
-      .select('*')
-      .eq('course_id', this.courseId)
-      .order('created_at', { ascending: false });
-
-    runInAction(() => {
-      this.course = data as Course;
-      this.likeCount = likeCount ?? 0;
-      this.userHasLiked = userHasLiked;
-      this.comments = (comments ?? []) as CourseComment[];
-      this.loading = false;
-    });
   }
 
   public async toggleLike(): Promise<void> {
@@ -87,14 +94,16 @@ class CourseDetailStore {
     this.likeLoading = true;
 
     if (this.userHasLiked) {
-      await supabase
+      const { error } = await supabase
         .from('course_likes')
         .delete()
         .eq('course_id', this.courseId)
         .eq('user_id', this.currentUserId);
       runInAction(() => {
-        this.userHasLiked = false;
-        this.likeCount = Math.max(0, this.likeCount - 1);
+        if (!error) {
+          this.userHasLiked = false;
+          this.likeCount = Math.max(0, this.likeCount - 1);
+        }
         this.likeLoading = false;
       });
     } else {
