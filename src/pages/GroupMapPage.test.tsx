@@ -1,10 +1,22 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { GroupMapPage } from './GroupMapPage';
+import type { Group } from '../types/group';
 
-const { mockStore, mockNavigate, mockFrom, mockCreateSignedUrl, mockGetUser } = vi.hoisted(() => ({
-  mockStore: {
+const FAKE_GROUP: Group = {
+  id: 'group-uuid-1',
+  name: '한라산 팀',
+  created_by: 'user-1',
+  gpx_path: 'user-1/group-uuid-1.gpx',
+  created_at: '2026-01-01T00:00:00Z',
+  max_members: null,
+};
+
+const FAKE_GPX = `<?xml version="1.0"?><gpx><trk><trkseg><trkpt lat="37.5" lon="126.9"></trkpt></trkseg></trk></gpx>`;
+
+const { mockMapStore, mockNavigate } = vi.hoisted(() => ({
+  mockMapStore: {
     map: null as naver.maps.Map | null,
     error: false,
     gpxPolyline: null,
@@ -13,15 +25,26 @@ const { mockStore, mockNavigate, mockFrom, mockCreateSignedUrl, mockGetUser } = 
     locate: vi.fn(),
     drawGpxRoute: vi.fn(),
     clearGpxRoute: vi.fn(),
+    startWatchingLocation: vi.fn(),
   },
   mockNavigate: vi.fn(),
-  mockFrom: vi.fn(),
-  mockCreateSignedUrl: vi.fn(),
-  mockGetUser: vi.fn(),
+}));
+
+const { mockGroupMapStore } = vi.hoisted(() => ({
+  mockGroupMapStore: {
+    group: undefined as Group | null | undefined,
+    gpxText: undefined as string | null | undefined,
+    currentUserId: null as string | null,
+    load: vi.fn(() => () => {}),
+  },
 }));
 
 vi.mock('../stores/MapStore', () => ({
-  MapStore: vi.fn(function () { return mockStore; }),
+  MapStore: vi.fn(function () { return mockMapStore; }),
+}));
+
+vi.mock('../stores/GroupMapStore', () => ({
+  GroupMapStore: vi.fn(function () { return mockGroupMapStore; }),
 }));
 
 vi.mock('react-router-dom', async (importOriginal) => {
@@ -31,28 +54,6 @@ vi.mock('react-router-dom', async (importOriginal) => {
     useNavigate: () => mockNavigate,
   };
 });
-
-vi.mock('../lib/supabase', () => ({
-  supabase: {
-    from: (...args: unknown[]) => mockFrom(...args),
-    storage: {
-      from: () => ({
-        createSignedUrl: (...args: unknown[]) => mockCreateSignedUrl(...args),
-      }),
-    },
-    auth: { getUser: () => mockGetUser() },
-  },
-}));
-
-const FAKE_GROUP = {
-  id: 'group-uuid-1',
-  name: '한라산 팀',
-  created_by: 'user-1',
-  gpx_path: 'user-1/group-uuid-1.gpx',
-  created_at: '2026-01-01T00:00:00Z',
-};
-
-const FAKE_GPX = `<?xml version="1.0"?><gpx><trk><trkseg><trkpt lat="37.5" lon="126.9"></trkpt></trkseg></trk></gpx>`;
 
 const renderAt = (path: string) =>
   render(
@@ -66,64 +67,26 @@ const renderAt = (path: string) =>
 
 describe('GroupMapPage', () => {
   beforeEach(() => {
-    mockStore.map = null;
-    mockStore.error = false;
+    mockMapStore.map = null;
+    mockMapStore.error = false;
     vi.clearAllMocks();
-
-    // 기본: 그룹 조회 성공
-    mockFrom.mockReturnValue({
-      select: () => ({
-        eq: () => ({
-          single: () => Promise.resolve({ data: FAKE_GROUP, error: null }),
-        }),
-      }),
-    });
-
-    // 기본: Signed URL 생성 성공
-    mockCreateSignedUrl.mockResolvedValue({
-      data: { signedUrl: 'https://storage.example.com/signed' },
-      error: null,
-    });
-
-    // 기본: GPX fetch 성공
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      text: () => Promise.resolve(FAKE_GPX),
-    }));
-
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null });
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
+    mockGroupMapStore.group = FAKE_GROUP;
+    mockGroupMapStore.gpxText = FAKE_GPX;
+    mockGroupMapStore.currentUserId = 'user-1';
+    mockGroupMapStore.load.mockReturnValue(() => {});
   });
 
   it('그룹을 찾지 못하면 /group으로 리다이렉트', async () => {
-    mockFrom.mockReturnValue({
-      select: () => ({
-        eq: () => ({
-          single: () => Promise.resolve({ data: null, error: { message: 'not found' } }),
-        }),
-      }),
-    });
-
+    mockGroupMapStore.group = null;
     renderAt('/group/nonexistent-id');
-
     await waitFor(() => {
       expect(screen.getByText('group list')).toBeInTheDocument();
     });
   });
 
   it('그룹 로딩 중 스피너 표시', () => {
-    // fetch가 resolve되지 않도록 지연
-    mockFrom.mockReturnValue({
-      select: () => ({
-        eq: () => ({
-          single: () => new Promise(() => {}), // 영원히 pending
-        }),
-      }),
-    });
-
+    mockGroupMapStore.group = undefined;
+    mockGroupMapStore.gpxText = undefined;
     renderAt('/group/group-uuid-1');
     expect(screen.getByRole('status')).toBeInTheDocument();
   });
@@ -149,16 +112,22 @@ describe('GroupMapPage', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/group');
   });
 
+  it('지도 로드 후 startWatchingLocation 호출', async () => {
+    renderAt('/group/group-uuid-1');
+    await waitFor(() => {
+      expect(mockMapStore.startWatchingLocation).toHaveBeenCalledOnce();
+    });
+  });
+
   it('로드 성공 후 drawGpxRoute 호출', async () => {
     renderAt('/group/group-uuid-1');
     await waitFor(() => {
-      expect(mockStore.drawGpxRoute).toHaveBeenCalledWith(FAKE_GPX);
+      expect(mockMapStore.drawGpxRoute).toHaveBeenCalledWith(FAKE_GPX);
     });
   });
 
   describe('소유자 vs 멤버 UI', () => {
     it('소유자에게 설정 링크 표시 (created_by 일치)', async () => {
-      // mockGetUser already returns 'user-1', FAKE_GROUP.created_by = 'user-1'
       renderAt('/group/group-uuid-1');
       await waitFor(() => {
         expect(screen.getByRole('link', { name: /설정/i })).toBeInTheDocument();
@@ -166,7 +135,7 @@ describe('GroupMapPage', () => {
     });
 
     it('멤버에게 설정 링크 숨김 (created_by 불일치)', async () => {
-      mockGetUser.mockResolvedValue({ data: { user: { id: 'other-user' } }, error: null });
+      mockGroupMapStore.currentUserId = 'other-user';
       renderAt('/group/group-uuid-1');
       await waitFor(() => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument();

@@ -5,98 +5,42 @@ import { runInAction } from 'mobx';
 import { Button } from '@/components/ui/button';
 import { Crosshair } from 'lucide-react';
 import { MapStore } from '../stores/MapStore';
-import { supabase } from '../lib/supabase';
-import type { Group } from '../types/group';
+import { GroupMapStore } from '../stores/GroupMapStore';
 
 export const GroupMapPage = observer(() => {
   const { id } = useParams();
   const navigate = useNavigate();
   const mapRef = useRef<HTMLDivElement>(null);
-  const [store] = useState(() => new MapStore());
-  const [group, setGroup] = useState<Group | null | undefined>(undefined);
-  const [gpxText, setGpxText] = useState<string | null | undefined>(undefined);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [mapStore] = useState(() => new MapStore());
+  const [store] = useState(() => new GroupMapStore(navigate));
 
-  // Effect 1: Fetch group + GPX (no DOM dependency)
+  // Effect 1: 데이터 fetch
   useEffect(() => {
-    let cancelled = false;
+    if (!id) return;
+    return store.load(id);
+  }, [store, id]);
 
-    (async () => {
-      // 1. Supabase에서 그룹 조회
-      const { data, error } = await supabase
-        .from('groups')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (cancelled) return;
-
-      if (error || !data) {
-        setGroup(null);
-        return;
-      }
-
-      setGroup(data as Group);
-
-      const { data: userData } = await supabase.auth.getUser();
-      setCurrentUserId(userData?.user?.id ?? null);
-
-      // 2. Signed URL 생성
-      const { data: urlData, error: urlError } = await supabase.storage
-        .from('gpx-files')
-        .createSignedUrl((data as Group).gpx_path, 3600);
-
-      if (cancelled) return;
-
-      if (urlError || !urlData?.signedUrl) {
-        setGpxText(null);
-        return;
-      }
-
-      // 3. GPX 텍스트 fetch
-      try {
-        const response = await fetch(urlData.signedUrl);
-        if (!response.ok) throw new Error('GPX fetch failed');
-        const text = await response.text();
-        if (!cancelled) {
-          setGpxText(text);
-        }
-      } catch {
-        if (!cancelled) {
-          setGpxText(null);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
-
-  // Effect 2: Init map + draw route once DOM ref & GPX text are ready
+  // Effect 2: 지도 초기화 + GPX 렌더링 (DOM ref + 데이터가 준비된 후)
   useEffect(() => {
-    if (!mapRef.current || gpxText === undefined || group === undefined || group === null) {
-      return () => { store.destroy(); };
+    if (!mapRef.current || store.gpxText === undefined || store.group === undefined || store.group === null) {
+      return () => { mapStore.destroy(); };
     }
 
-    store.initMap(mapRef.current);
+    mapStore.initMap(mapRef.current);
+    mapStore.startWatchingLocation(); // initMap 실패 시(map === null) 자동 no-op
 
-    if (gpxText !== null) {
-      store.drawGpxRoute(gpxText);
+    if (store.gpxText !== null) {
+      mapStore.drawGpxRoute(store.gpxText);
     } else {
-      runInAction(() => { store.error = true; });
+      runInAction(() => { mapStore.error = true; });
     }
 
-    return () => {
-      store.destroy();
-    };
-  }, [store, gpxText, group]);
+    return () => { mapStore.destroy(); };
+  }, [mapStore, store.gpxText, store.group]);
 
-  // 그룹 없음 → 리다이렉트 (로딩 완료 여부와 무관하게 즉시)
-  if (group === null) return <Navigate to="/group" replace />;
+  if (store.group === null) return <Navigate to="/group" replace />;
 
-  // 로딩 중
-  if (group === undefined || gpxText === undefined) {
+  if (store.group === undefined || store.gpxText === undefined) {
     return (
       <div className="absolute inset-0 flex items-center justify-center bg-black">
         <div
@@ -117,19 +61,19 @@ export const GroupMapPage = observer(() => {
       />
 
       {/* 에러 오버레이 */}
-      {store.error && (
+      {mapStore.error && (
         <div className="absolute inset-0 flex items-center justify-center bg-neutral-100">
           <p className="text-sm text-neutral-500">지도를 불러올 수 없습니다</p>
         </div>
       )}
 
       {/* 내 위치 버튼 */}
-      {store.map && (
+      {mapStore.map && (
         <div className="absolute right-3 bottom-3">
           <Button
             variant="secondary"
             size="icon"
-            onClick={() => store.locate()}
+            onClick={() => mapStore.locate()}
             aria-label="내 위치"
             className="bg-white hover:bg-neutral-50 shadow-md"
           >
@@ -144,12 +88,12 @@ export const GroupMapPage = observer(() => {
           onClick={() => navigate('/group')}
           className="bg-white/90 text-black px-3 py-1 rounded-full text-sm font-medium shadow"
         >
-          ← {group.name}
+          ← {store.group.name}
         </button>
       </div>
 
       {/* 설정 버튼 (소유자 전용) */}
-      {currentUserId && group && currentUserId === group.created_by && (
+      {store.currentUserId && store.group && store.currentUserId === store.group.created_by && (
         <div className="absolute top-4 right-4">
           <a
             href={`/group/${id}/settings`}
