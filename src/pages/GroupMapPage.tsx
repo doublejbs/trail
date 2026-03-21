@@ -67,6 +67,18 @@ export const GroupMapPage = observer(() => {
         </div>
       )}
 
+      {/* 코스로 돌아가기 버튼 */}
+      {mapStore.map && !mapStore.isCourseVisible && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2">
+          <button
+            onClick={() => mapStore.returnToCourse()}
+            className="bg-white/90 text-black px-4 py-2 rounded-full text-sm font-medium shadow-md whitespace-nowrap"
+          >
+            코스로 돌아가기
+          </button>
+        </div>
+      )}
+
       {/* 내 위치 버튼 */}
       {mapStore.map && (
         <div className="absolute right-3 bottom-3">

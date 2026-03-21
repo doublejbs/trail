@@ -20,12 +20,14 @@ const { mockMapStore, mockNavigate } = vi.hoisted(() => ({
     map: null as naver.maps.Map | null,
     error: false,
     gpxPolyline: null,
+    isCourseVisible: true,
     initMap: vi.fn(),
     destroy: vi.fn(),
     locate: vi.fn(),
     drawGpxRoute: vi.fn(),
     clearGpxRoute: vi.fn(),
     startWatchingLocation: vi.fn(),
+    returnToCourse: vi.fn(),
   },
   mockNavigate: vi.fn(),
 }));
@@ -141,6 +143,38 @@ describe('GroupMapPage', () => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument();
       });
       expect(screen.queryByRole('link', { name: /설정/i })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('코스로 돌아가기 버튼', () => {
+    it('isCourseVisible이 false이면 버튼 표시', async () => {
+      mockMapStore.map = {} as naver.maps.Map;
+      mockMapStore.isCourseVisible = false;
+      renderAt('/group/group-uuid-1');
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /코스로 돌아가기/ })).toBeInTheDocument();
+      });
+    });
+
+    it('isCourseVisible이 true이면 버튼 미표시', async () => {
+      mockMapStore.map = {} as naver.maps.Map;
+      mockMapStore.isCourseVisible = true;
+      renderAt('/group/group-uuid-1');
+      await waitFor(() => {
+        expect(screen.getByTestId('map-container')).toBeInTheDocument();
+      });
+      expect(screen.queryByRole('button', { name: /코스로 돌아가기/ })).not.toBeInTheDocument();
+    });
+
+    it('버튼 클릭 시 returnToCourse 호출', async () => {
+      mockMapStore.map = {} as naver.maps.Map;
+      mockMapStore.isCourseVisible = false;
+      renderAt('/group/group-uuid-1');
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /코스로 돌아가기/ })).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByRole('button', { name: /코스로 돌아가기/ }));
+      expect(mockMapStore.returnToCourse).toHaveBeenCalledOnce();
     });
   });
 });
