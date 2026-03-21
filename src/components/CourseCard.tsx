@@ -29,9 +29,9 @@ export function CourseCard({ course, likeCount, onClick }: Props) {
     if (!el) return;
 
     const observer = new IntersectionObserver(
-      async ([entry]) => {
+      async ([entry], observerInstance) => {
         if (!entry?.isIntersecting) return;
-        observer.disconnect();
+        observerInstance.disconnect();
 
         try {
           const { data, error } = await supabase.storage
@@ -48,6 +48,7 @@ export function CourseCard({ course, likeCount, onClick }: Props) {
           if (!coords) { setThumbError(true); return; }
 
           const points = normaliseCoordsToSvgPoints(coords, THUMB_W, THUMB_H);
+          if (!points) { setThumbError(true); return; }
           setSvgPoints(points);
         } catch {
           setThumbError(true);
@@ -80,7 +81,7 @@ export function CourseCard({ course, likeCount, onClick }: Props) {
         {thumbError || (!svgPoints && !thumbError) ? (
           <rect width={THUMB_W} height={THUMB_H} fill="#e5e5e5" rx="0" />
         ) : svgPoints ? (
-          svgPoints.split(' ').length === 1 ? (
+          !svgPoints.includes(' ') ? (
             /* single point */
             <circle cx={svgPoints.split(',')[0]} cy={svgPoints.split(',')[1]} r="4" fill="#FF5722" />
           ) : (

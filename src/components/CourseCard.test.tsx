@@ -3,6 +3,16 @@ import { render, screen } from '@testing-library/react';
 import { CourseCard } from './CourseCard';
 import type { Course } from '../types/course';
 
+vi.mock('../lib/supabase', () => ({
+  supabase: {
+    storage: {
+      from: () => ({
+        createSignedUrl: vi.fn().mockResolvedValue({ data: null, error: { message: 'fail' } }),
+      }),
+    },
+  },
+}));
+
 const COURSE: Course = {
   id: 'c1',
   created_by: 'u1',
@@ -54,6 +64,22 @@ describe('CourseCard', () => {
   it('renders grey placeholder SVG initially (before intersection)', () => {
     const { container } = render(<CourseCard course={COURSE} likeCount={0} onClick={() => {}} />);
     // The placeholder rect should be present before GPX is fetched
+    const rect = container.querySelector('rect');
+    expect(rect).not.toBeNull();
+  });
+
+  it('renders grey placeholder when GPX fetch fails', async () => {
+    vi.stubGlobal('IntersectionObserver', class {
+      observe = vi.fn();
+      disconnect = vi.fn();
+      constructor(cb: IntersectionObserverCallback) {
+        // fire with isIntersecting: true so the fetch is triggered
+        void cb([{ isIntersecting: true } as IntersectionObserverEntry], this as unknown as IntersectionObserver);
+      }
+    });
+    const { container } = render(<CourseCard course={COURSE} likeCount={0} onClick={() => {}} />);
+    // Wait for the async observer callback to complete
+    await new Promise((r) => setTimeout(r, 0));
     const rect = container.querySelector('rect');
     expect(rect).not.toBeNull();
   });
