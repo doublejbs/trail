@@ -6,6 +6,7 @@ import { Heart, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { CourseDetailStore } from '../stores/CourseDetailStore';
 import { MapStore } from '../stores/MapStore';
+import { ElevationChart } from '../components/ElevationChart';
 import { supabase } from '../lib/supabase';
 
 export const CourseDetailPage = observer(() => {
@@ -134,6 +135,12 @@ export const CourseDetailPage = observer(() => {
             </div>
           )}
         </div>
+
+        {typeof gpxText === 'string' && (
+          <div className="border-b border-neutral-100">
+            <ElevationChart gpxText={gpxText} />
+          </div>
+        )}
 
         {/* Like */}
         <div className="flex items-center gap-2 px-4 py-3 border-b border-neutral-100">
