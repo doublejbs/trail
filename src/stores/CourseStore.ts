@@ -24,6 +24,7 @@ class CourseStore {
   }
 
   public async fetchPage(): Promise<void> {
+    if (this.loading) return;
     this.loading = true;
     this.error = null;
 
