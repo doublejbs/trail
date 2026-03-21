@@ -4,7 +4,7 @@ import { MapStore } from './MapStore';
 const mockPolyline = { setMap: vi.fn() };
 const mockStartMarker = { setMap: vi.fn() };
 const mockEndMarker = { setMap: vi.fn() };
-const mockMap = { setCenter: vi.fn(), destroy: vi.fn() };
+const mockMap = { setCenter: vi.fn(), destroy: vi.fn(), fitBounds: vi.fn(), getBounds: vi.fn() };
 const mockNaverMaps = {
   Map: vi.fn(function () { return mockMap; }),
   LatLng: vi.fn(function (lat: number, lng: number) { return { lat, lng }; }),
@@ -146,6 +146,12 @@ describe('MapStore', () => {
         const count = markerCallCount++;
         return count === 0 ? mockStartMarker : mockEndMarker;
       });
+      const mockBoundsInstance = { extend: vi.fn().mockReturnThis(), intersects: vi.fn().mockReturnValue(true) };
+      (mockNaverMaps as Record<string, unknown>).LatLngBounds = vi.fn(function () { return mockBoundsInstance; });
+      (mockNaverMaps as Record<string, unknown>).Event = {
+        addListener: vi.fn(() => ({ id: 'idle-listener' })),
+        removeListener: vi.fn(),
+      };
       store = new MapStore();
       (window as unknown as Record<string, unknown>).naver = { maps: mockNaverMaps };
       store.initMap(document.createElement('div'));
@@ -375,6 +381,68 @@ describe('MapStore', () => {
     it('watchId가 null이면 clearWatch 미호출', () => {
       store.stopWatchingLocation();
       expect(clearSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('gpxBounds 및 isCourseVisible', () => {
+    let mockBounds: { extend: ReturnType<typeof vi.fn>; intersects: ReturnType<typeof vi.fn> };
+    let idleCallback: (() => void) | null;
+
+    beforeEach(() => {
+      mockBounds = { extend: vi.fn().mockReturnThis(), intersects: vi.fn().mockReturnValue(true) };
+      idleCallback = null;
+      (mockNaverMaps as Record<string, unknown>).LatLngBounds = vi.fn(function () { return mockBounds; });
+      (mockNaverMaps as Record<string, unknown>).Event = {
+        addListener: vi.fn((_map: unknown, event: string, cb: () => void) => {
+          if (event === 'idle') idleCallback = cb;
+          return { id: 'idle-listener' };
+        }),
+        removeListener: vi.fn(),
+      };
+      mockNaverMaps.Polyline.mockImplementation(function () { return mockPolyline; });
+      (window as unknown as Record<string, unknown>).naver = { maps: mockNaverMaps };
+      store = new MapStore();
+      store.initMap(document.createElement('div'));
+    });
+
+    it('drawGpxRoute 성공 후 LatLngBounds 생성', () => {
+      store.drawGpxRoute(GPX_TWO_POINTS);
+      expect((mockNaverMaps as Record<string, unknown>).LatLngBounds).toHaveBeenCalled();
+    });
+
+    it('drawGpxRoute 성공 후 idle 이벤트 리스너 등록', () => {
+      store.drawGpxRoute(GPX_TWO_POINTS);
+      expect(((mockNaverMaps as Record<string, unknown>).Event as { addListener: ReturnType<typeof vi.fn> }).addListener)
+        .toHaveBeenCalledWith(mockMap, 'idle', expect.any(Function));
+    });
+
+    it('idle 콜백 — intersects false이면 isCourseVisible=false', () => {
+      store.drawGpxRoute(GPX_TWO_POINTS);
+      mockMap.getBounds.mockReturnValue({ intersects: vi.fn().mockReturnValue(false) });
+      idleCallback!();
+      expect(store.isCourseVisible).toBe(false);
+    });
+
+    it('idle 콜백 — intersects true이면 isCourseVisible=true', () => {
+      store.drawGpxRoute(GPX_TWO_POINTS);
+      mockMap.getBounds.mockReturnValue({ intersects: vi.fn().mockReturnValue(true) });
+      store.isCourseVisible = false;
+      idleCallback!();
+      expect(store.isCourseVisible).toBe(true);
+    });
+
+    it('clearGpxRoute 후 isCourseVisible=true 복원', () => {
+      store.drawGpxRoute(GPX_TWO_POINTS);
+      store.isCourseVisible = false;
+      store.clearGpxRoute();
+      expect(store.isCourseVisible).toBe(true);
+    });
+
+    it('clearGpxRoute 후 idle 리스너 제거', () => {
+      store.drawGpxRoute(GPX_TWO_POINTS);
+      store.clearGpxRoute();
+      expect(((mockNaverMaps as Record<string, unknown>).Event as { removeListener: ReturnType<typeof vi.fn> }).removeListener)
+        .toHaveBeenCalled();
     });
   });
 });

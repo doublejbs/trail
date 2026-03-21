@@ -11,6 +11,9 @@ class MapStore {
   public startMarker: naver.maps.Marker | null = null;
   public endMarker: naver.maps.Marker | null = null;
   public locationMarker: naver.maps.Marker | null = null;
+  public isCourseVisible: boolean = true;
+  private gpxBounds: naver.maps.LatLngBounds | null = null;
+  private idleListener: naver.maps.MapEventListener | null = null;
 
   private watchId: number | null = null;
 
@@ -108,6 +111,29 @@ class MapStore {
 
     this.map.setCenter(path[0]);
 
+    // gpxBounds 계산
+    const bounds = path.reduce(
+      (b, pt) => b.extend(pt),
+      new window.naver.maps.LatLngBounds(path[0], path[0]),
+    );
+    this.gpxBounds = bounds;
+
+    // 기존 idle 리스너 정리 후 재등록
+    if (this.idleListener) {
+      window.naver.maps.Event.removeListener(this.idleListener);
+    }
+    this.idleListener = window.naver.maps.Event.addListener(
+      this.map,
+      'idle',
+      () => {
+        if (!this.map || !this.gpxBounds) return;
+        const mapBounds = this.map.getBounds() as naver.maps.LatLngBounds;
+        runInAction(() => {
+          this.isCourseVisible = mapBounds.intersects(this.gpxBounds!);
+        });
+      },
+    );
+
     // 이전 경로/마커 정리 (재호출 시 leak 방지)
     this.gpxPolyline?.setMap(null);
     this.startMarker?.setMap(null);
@@ -139,6 +165,12 @@ class MapStore {
   }
 
   public clearGpxRoute(): void {
+    if (this.idleListener) {
+      window.naver.maps.Event.removeListener(this.idleListener);
+      this.idleListener = null;
+    }
+    this.gpxBounds = null;
+    this.isCourseVisible = true;
     this.gpxPolyline?.setMap(null);
     this.gpxPolyline = null;
     this.startMarker?.setMap(null);
