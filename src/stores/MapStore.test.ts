@@ -216,6 +216,14 @@ describe('MapStore', () => {
         expect(mockPolyline.setMap).toHaveBeenCalledWith(null);
         expect(store.gpxPolyline).toBeNull();
       });
+
+      it('destroy() 호출 시 clearWatch 호출', () => {
+        const clearSpy = vi.spyOn(navigator.geolocation, 'clearWatch').mockImplementation(() => {});
+        vi.spyOn(navigator.geolocation, 'watchPosition').mockReturnValue(42);
+        store.startWatchingLocation();
+        store.destroy();
+        expect(clearSpy).toHaveBeenCalledWith(42);
+      });
     });
 
     describe('재호출 시 이전 경로 정리', () => {
@@ -275,6 +283,111 @@ describe('MapStore', () => {
         expect(store.startMarker).toBeNull();
         expect(store.endMarker).toBeNull();
       });
+    });
+  });
+
+  describe('startWatchingLocation()', () => {
+    let watchSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      const defaultLocationMarker = { setMap: vi.fn(), setPosition: vi.fn() };
+      mockNaverMaps.Marker.mockImplementation(function () { return defaultLocationMarker; });
+      watchSpy = vi.spyOn(navigator.geolocation, 'watchPosition').mockImplementation(() => 42);
+      (window as unknown as Record<string, unknown>).naver = { maps: mockNaverMaps };
+      store = new MapStore();
+      store.initMap(document.createElement('div'));
+    });
+
+    it('map이 있으면 watchPosition 호출', () => {
+      store.startWatchingLocation();
+      expect(watchSpy).toHaveBeenCalledOnce();
+    });
+
+    it('map이 null이면 watchPosition 미호출', () => {
+      store = new MapStore(); // map이 null인 새 store
+      store.startWatchingLocation();
+      expect(watchSpy).not.toHaveBeenCalled();
+    });
+
+    it('첫 번째 위치 콜백에서 setCenter 호출', () => {
+      watchSpy.mockImplementation((cb) => {
+        cb({ coords: { latitude: 37.1, longitude: 127.1 } } as GeolocationPosition);
+        return 42;
+      });
+      store.startWatchingLocation();
+      expect(mockMap.setCenter).toHaveBeenCalledWith({ lat: 37.1, lng: 127.1 });
+    });
+
+    it('두 번째 위치 콜백에서 setCenter 미호출', () => {
+      let cbRef: ((pos: GeolocationPosition) => void) | null = null;
+      watchSpy.mockImplementation((cb) => {
+        cbRef = cb as (pos: GeolocationPosition) => void;
+        cb({ coords: { latitude: 37.1, longitude: 127.1 } } as GeolocationPosition);
+        return 42;
+      });
+      store.startWatchingLocation();
+      vi.mocked(mockMap.setCenter).mockClear();
+      cbRef!({ coords: { latitude: 37.2, longitude: 127.2 } } as GeolocationPosition);
+      expect(mockMap.setCenter).not.toHaveBeenCalled();
+    });
+
+    it('위치 콜백에서 Marker 생성', () => {
+      const mockLocationMarker = { setMap: vi.fn(), setPosition: vi.fn() };
+      mockNaverMaps.Marker.mockImplementation(function () { return mockLocationMarker; });
+      watchSpy.mockImplementation((cb) => {
+        cb({ coords: { latitude: 37.1, longitude: 127.1 } } as GeolocationPosition);
+        return 42;
+      });
+      store.startWatchingLocation();
+      expect(store.locationMarker).not.toBeNull();
+    });
+
+    it('두 번째 위치 콜백에서 새 마커 생성 없이 setPosition 호출', () => {
+      const mockLocationMarker = { setMap: vi.fn(), setPosition: vi.fn() };
+      mockNaverMaps.Marker.mockImplementation(function () { return mockLocationMarker; });
+      let cbRef: ((pos: GeolocationPosition) => void) | null = null;
+      watchSpy.mockImplementation((cb) => {
+        cbRef = cb as (pos: GeolocationPosition) => void;
+        cb({ coords: { latitude: 37.1, longitude: 127.1 } } as GeolocationPosition);
+        return 42;
+      });
+      store.startWatchingLocation();
+      const markerCallsBefore = (mockNaverMaps.Marker as ReturnType<typeof vi.fn>).mock.calls.length;
+      cbRef!({ coords: { latitude: 37.2, longitude: 127.2 } } as GeolocationPosition);
+      expect((mockNaverMaps.Marker as ReturnType<typeof vi.fn>).mock.calls.length).toBe(markerCallsBefore);
+      expect(mockLocationMarker.setPosition).toHaveBeenCalledWith({ lat: 37.2, lng: 127.2 });
+    });
+  });
+
+  describe('stopWatchingLocation()', () => {
+    let watchSpy: ReturnType<typeof vi.spyOn>;
+    let clearSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      watchSpy = vi.spyOn(navigator.geolocation, 'watchPosition').mockReturnValue(42);
+      clearSpy = vi.spyOn(navigator.geolocation, 'clearWatch').mockImplementation(() => {});
+      const mockLocationMarker = { setMap: vi.fn(), setPosition: vi.fn() };
+      mockNaverMaps.Marker.mockImplementation(function () { return mockLocationMarker; });
+      (window as unknown as Record<string, unknown>).naver = { maps: mockNaverMaps };
+      store = new MapStore();
+      store.initMap(document.createElement('div'));
+    });
+
+    it('clearWatch 호출 + 마커 제거', () => {
+      // 위치 콜백으로 마커 먼저 생성
+      watchSpy.mockImplementation((cb) => {
+        cb({ coords: { latitude: 37.1, longitude: 127.1 } } as GeolocationPosition);
+        return 42;
+      });
+      store.startWatchingLocation();
+      store.stopWatchingLocation();
+      expect(clearSpy).toHaveBeenCalledWith(42);
+      expect(store.locationMarker).toBeNull();
+    });
+
+    it('watchId가 null이면 clearWatch 미호출', () => {
+      store.stopWatchingLocation();
+      expect(clearSpy).not.toHaveBeenCalled();
     });
   });
 });

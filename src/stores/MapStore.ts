@@ -10,6 +10,10 @@ class MapStore {
   public gpxPolyline: naver.maps.Polyline | null = null;
   public startMarker: naver.maps.Marker | null = null;
   public endMarker: naver.maps.Marker | null = null;
+  public locationMarker: naver.maps.Marker | null = null;
+
+  private watchId: number | null = null;
+  private hasInitialCenter: boolean = false;
 
   public constructor() {
     makeAutoObservable(this, {
@@ -17,6 +21,7 @@ class MapStore {
       gpxPolyline: observable.ref,
       startMarker: observable.ref,
       endMarker: observable.ref,
+      locationMarker: observable.ref,
     });
   }
 
@@ -144,6 +149,7 @@ class MapStore {
   }
 
   public destroy(): void {
+    this.stopWatchingLocation();
     this.clearGpxRoute();
     this.map?.destroy();
     this.map = null;
@@ -157,6 +163,50 @@ class MapStore {
       const { latitude, longitude } = pos.coords;
       this.map!.setCenter(new window.naver.maps.LatLng(latitude, longitude));
     });
+  }
+
+  public stopWatchingLocation(): void {
+    if (this.watchId !== null) {
+      navigator.geolocation.clearWatch(this.watchId);
+      this.watchId = null;
+    }
+    this.locationMarker?.setMap(null);
+    this.locationMarker = null;
+    this.hasInitialCenter = false;
+  }
+
+  public startWatchingLocation(): void {
+    if (!this.map) return;
+    if (!navigator.geolocation) return;
+
+    this.watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        if (!this.map) return;
+        const { latitude, longitude } = pos.coords;
+        const latLng = new window.naver.maps.LatLng(latitude, longitude);
+
+        runInAction(() => {
+          if (!this.hasInitialCenter) {
+            this.map!.setCenter(latLng);
+            this.hasInitialCenter = true;
+          }
+
+          if (!this.locationMarker) {
+            this.locationMarker = new window.naver.maps.Marker({
+              map: this.map!,
+              position: latLng,
+              icon: {
+                content: '<div style="width:14px;height:14px;border-radius:50%;background:#4A90D9;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div>',
+                anchor: new window.naver.maps.Point(7, 7),
+              },
+            });
+          } else {
+            this.locationMarker.setPosition(latLng);
+          }
+        });
+      },
+      () => { /* 에러 무시 */ },
+    );
   }
 }
 
