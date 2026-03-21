@@ -111,7 +111,7 @@ public returnToCourse(): void {
 
 ```tsx
 {mapStore.map && !mapStore.isCourseVisible && (
-  <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
+  <div className="absolute bottom-20 left-1/2 -translate-x-1/2">
     <button
       onClick={() => mapStore.returnToCourse()}
       className="bg-white/90 text-black px-4 py-2 rounded-full text-sm font-medium shadow-md whitespace-nowrap"
