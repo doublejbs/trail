@@ -309,25 +309,12 @@ describe('MapStore', () => {
       expect(watchSpy).not.toHaveBeenCalled();
     });
 
-    it('첫 번째 위치 콜백에서 setCenter 호출', () => {
+    it('위치 콜백에서 setCenter 미호출', () => {
       watchSpy.mockImplementation((cb) => {
         cb({ coords: { latitude: 37.1, longitude: 127.1 } } as GeolocationPosition);
         return 42;
       });
       store.startWatchingLocation();
-      expect(mockMap.setCenter).toHaveBeenCalledWith({ lat: 37.1, lng: 127.1 });
-    });
-
-    it('두 번째 위치 콜백에서 setCenter 미호출', () => {
-      let cbRef: ((pos: GeolocationPosition) => void) | null = null;
-      watchSpy.mockImplementation((cb) => {
-        cbRef = cb as (pos: GeolocationPosition) => void;
-        cb({ coords: { latitude: 37.1, longitude: 127.1 } } as GeolocationPosition);
-        return 42;
-      });
-      store.startWatchingLocation();
-      vi.mocked(mockMap.setCenter).mockClear();
-      cbRef!({ coords: { latitude: 37.2, longitude: 127.2 } } as GeolocationPosition);
       expect(mockMap.setCenter).not.toHaveBeenCalled();
     });
 

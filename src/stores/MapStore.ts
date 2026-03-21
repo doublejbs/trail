@@ -13,7 +13,6 @@ class MapStore {
   public locationMarker: naver.maps.Marker | null = null;
 
   private watchId: number | null = null;
-  private hasInitialCenter: boolean = false;
 
   public constructor() {
     makeAutoObservable(this, {
@@ -172,7 +171,6 @@ class MapStore {
     }
     this.locationMarker?.setMap(null);
     this.locationMarker = null;
-    this.hasInitialCenter = false;
   }
 
   public startWatchingLocation(): void {
@@ -186,11 +184,6 @@ class MapStore {
         const latLng = new window.naver.maps.LatLng(latitude, longitude);
 
         runInAction(() => {
-          if (!this.hasInitialCenter) {
-            this.map!.setCenter(latLng);
-            this.hasInitialCenter = true;
-          }
-
           if (!this.locationMarker) {
             this.locationMarker = new window.naver.maps.Marker({
               map: this.map!,
