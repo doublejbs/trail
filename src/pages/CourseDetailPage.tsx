@@ -89,12 +89,13 @@ export const CourseDetailPage = observer(() => {
   }
 
   const course = store.course!;
+  const MAP_HEIGHT = '45vh';
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="absolute inset-0 bg-white">
       {/* Map */}
-      <div className="relative" style={{ height: '45vh' }}>
-        <div ref={mapRef} data-testid="map-container" className="absolute inset-0" />
+      <div className="absolute inset-x-0 top-0" style={{ height: MAP_HEIGHT }}>
+        <div ref={mapRef} data-testid="map-container" className="absolute inset-0 w-full h-full" />
 
         {mapStore.error && (
           <div className="absolute inset-0 flex items-center justify-center bg-neutral-100">
@@ -114,7 +115,7 @@ export const CourseDetailPage = observer(() => {
       </div>
 
       {/* Scrollable detail */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="absolute inset-x-0 overflow-y-auto" style={{ top: MAP_HEIGHT, bottom: 0 }}>
         {/* Title + stats */}
         <div className="px-4 pt-4 pb-3 border-b border-neutral-100">
           <h1 className="text-lg font-bold text-black mb-2">{course.name}</h1>
@@ -192,3 +193,4 @@ export const CourseDetailPage = observer(() => {
     </div>
   );
 });
+
