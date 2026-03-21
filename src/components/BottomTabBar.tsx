@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Users, Clock, User } from 'lucide-react';
+import { Users, Map, User } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 interface Tab {
@@ -9,9 +9,9 @@ interface Tab {
 }
 
 const TABS: Tab[] = [
-  { path: '/group', label: '그룹', icon: <Users size={22} strokeWidth={2} /> },
-  { path: '/history', label: '기록', icon: <Clock size={22} strokeWidth={2} /> },
-  { path: '/profile', label: '프로필', icon: <User size={22} strokeWidth={2} /> },
+  { path: '/group', label: '그룹', icon: <Users size={20} strokeWidth={2} /> },
+  { path: '/course', label: '코스', icon: <Map size={20} strokeWidth={2} /> },
+  { path: '/profile', label: '프로필', icon: <User size={20} strokeWidth={2} /> },
 ];
 
 function isActive(tabPath: string, currentPath: string): boolean {
@@ -23,23 +23,35 @@ export function BottomTabBar() {
   const navigate = useNavigate();
 
   return (
-    <div className="bg-black border-t border-[#222] flex-shrink-0">
-      <div className="flex justify-around items-center pt-2 pb-1">
+    <div className="absolute bottom-0 left-0 right-0 px-6 pb-6">
+      <div
+        className="flex items-stretch rounded-[28px] p-1"
+        style={{
+          background: 'rgba(28, 28, 30, 0.82)',
+          backdropFilter: 'blur(40px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.28), 0 1.5px 0 rgba(255,255,255,0.08) inset',
+        }}
+      >
         {TABS.map((tab) => {
           const active = isActive(tab.path, location.pathname);
           return (
             <button
               key={tab.path}
               onClick={() => navigate(tab.path)}
-              className="flex flex-col items-center gap-[3px] min-w-[52px] py-1"
+              className="flex flex-1 flex-col items-center justify-center gap-1 py-2 rounded-[20px] transition-all duration-200"
               aria-label={tab.label}
             >
-              <span className={active ? 'text-white' : 'text-[#555]'}>
+              <span
+                className={`transition-all duration-200 ${
+                  active ? 'text-white' : 'text-white/40'
+                }`}
+              >
                 {tab.icon}
               </span>
               <span
-                className={`text-[9px] tracking-tight ${
-                  active ? 'text-white font-semibold' : 'text-[#555] font-normal'
+                className={`text-[10px] leading-none tracking-tight transition-all duration-200 ${
+                  active ? 'text-white font-semibold' : 'text-white/40 font-normal'
                 }`}
               >
                 {tab.label}
@@ -47,10 +59,6 @@ export function BottomTabBar() {
             </button>
           );
         })}
-      </div>
-      {/* iOS 홈 인디케이터 */}
-      <div className="flex justify-center pb-[6px] pt-1">
-        <div className="w-[100px] h-[4px] bg-white/30 rounded-full" />
       </div>
     </div>
   );

@@ -7,7 +7,9 @@ import { GroupPage } from './pages/GroupPage';
 import { GroupCreatePage } from './pages/GroupCreatePage';
 import { GroupMapPage } from './pages/GroupMapPage';
 import { GroupSettingsPage } from './pages/GroupSettingsPage';
-import { HistoryPage } from './pages/HistoryPage';
+import { CoursePage } from './pages/CoursePage';
+import { CourseUploadPage } from './pages/CourseUploadPage';
+import { CourseDetailPage } from './pages/CourseDetailPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { InvitePage } from './pages/InvitePage';
 
@@ -34,7 +36,9 @@ export default function App() {
           <Route path="group/new" element={<GroupCreatePage />} />
           <Route path="group/:id" element={<GroupMapPage />} />
           <Route path="group/:id/settings" element={<GroupSettingsPage />} />
-          <Route path="history" element={<HistoryPage />} />
+          <Route path="course" element={<CoursePage />} />
+          <Route path="course/new" element={<CourseUploadPage />} />
+          <Route path="course/:id" element={<CourseDetailPage />} />
           <Route path="profile" element={<ProfilePage />} />
         </Route>
       </Routes>
