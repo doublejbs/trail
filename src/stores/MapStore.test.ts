@@ -445,4 +445,39 @@ describe('MapStore', () => {
         .toHaveBeenCalled();
     });
   });
+
+  describe('returnToCourse()', () => {
+    let mockBounds: { extend: ReturnType<typeof vi.fn>; intersects: ReturnType<typeof vi.fn> };
+
+    beforeEach(() => {
+      mockBounds = { extend: vi.fn().mockReturnThis(), intersects: vi.fn().mockReturnValue(true) };
+      (mockNaverMaps as Record<string, unknown>).LatLngBounds = vi.fn(function () { return mockBounds; });
+      (mockNaverMaps as Record<string, unknown>).Event = {
+        addListener: vi.fn(() => ({ id: 'idle-listener' })),
+        removeListener: vi.fn(),
+      };
+      mockNaverMaps.Polyline.mockImplementation(function () { return mockPolyline; });
+      (window as unknown as Record<string, unknown>).naver = { maps: mockNaverMaps };
+      store = new MapStore();
+      store.initMap(document.createElement('div'));
+    });
+
+    it('gpxBounds가 null이 아닐 때 fitBounds 호출', () => {
+      store.drawGpxRoute(GPX_TWO_POINTS);
+      store.returnToCourse();
+      expect(mockMap.fitBounds).toHaveBeenCalledWith(expect.any(Object), { top: 50, right: 50, bottom: 50, left: 50 });
+    });
+
+    it('gpxBounds가 null이면 fitBounds 미호출', () => {
+      store.returnToCourse();
+      expect(mockMap.fitBounds).not.toHaveBeenCalled();
+    });
+
+    it('map이 null이면 fitBounds 미호출', () => {
+      store.map = null;
+      store.drawGpxRoute(GPX_TWO_POINTS);
+      store.returnToCourse();
+      expect(mockMap.fitBounds).not.toHaveBeenCalled();
+    });
+  });
 });

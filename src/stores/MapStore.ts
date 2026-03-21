@@ -234,6 +234,11 @@ class MapStore {
       () => { /* 에러 무시 */ },
     );
   }
+
+  public returnToCourse(): void {
+    if (!this.map || !this.gpxBounds) return;
+    this.map.fitBounds(this.gpxBounds, { top: 50, right: 50, bottom: 50, left: 50 });
+  }
 }
 
 export { MapStore };
