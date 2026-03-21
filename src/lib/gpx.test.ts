@@ -5,6 +5,8 @@ import {
   computeDistanceM,
   computeElevationGainM,
   normaliseCoordsToSvgPoints,
+  buildElevationProfile,
+  type GpxCoord,
 } from './gpx';
 
 const ONE_POINT_GPX = `<?xml version="1.0"?>
@@ -25,6 +27,20 @@ const NO_ELE_GPX = `<?xml version="1.0"?>
 </trkseg></trk></gpx>`;
 
 const INVALID_GPX = `not xml at all`;
+
+const THREE_POINT_GPX = `<?xml version="1.0"?>
+<gpx><trk><trkseg>
+  <trkpt lat="37.5" lon="127.0"><ele>120</ele></trkpt>
+  <trkpt lat="37.501" lon="127.001"><ele>135</ele></trkpt>
+  <trkpt lat="37.502" lon="127.002"><ele>148</ele></trkpt>
+</trkseg></trk></gpx>`;
+
+const MIXED_ELE_GPX = `<?xml version="1.0"?>
+<gpx><trk><trkseg>
+  <trkpt lat="37.5" lon="127.0"></trkpt>
+  <trkpt lat="37.501" lon="127.001"><ele>50</ele></trkpt>
+  <trkpt lat="37.502" lon="127.002"><ele>60</ele></trkpt>
+</trkseg></trk></gpx>`;
 
 describe('parseGpxCoords', () => {
   it('returns coords from valid GPX', () => {
@@ -107,5 +123,64 @@ describe('normaliseCoordsToSvgPoints', () => {
     ];
     const result = normaliseCoordsToSvgPoints(coords, 160, 100);
     expect(result).toBe('4,96 96,4');
+  });
+});
+
+describe('buildElevationProfile', () => {
+  it('returns null for 0 points', () => {
+    expect(buildElevationProfile([])).toBeNull();
+  });
+
+  it('returns null for 1 point', () => {
+    const coords = parseGpxCoords(ONE_POINT_GPX)!;
+    expect(buildElevationProfile(coords)).toBeNull();
+  });
+
+  it('returns null when all ele values are null', () => {
+    const coords = parseGpxCoords(NO_ELE_GPX)!;
+    expect(buildElevationProfile(coords)).toBeNull();
+  });
+
+  it('returns array of ElevationPoints for normal 3-point GPX', () => {
+    const coords = parseGpxCoords(THREE_POINT_GPX)!;
+    const profile = buildElevationProfile(coords);
+    expect(profile).not.toBeNull();
+    expect(profile).toHaveLength(3);
+    expect(profile![0].distanceKm).toBe(0);
+    expect(profile![0].elevationM).toBe(120);
+    expect(profile![1].distanceKm).toBeGreaterThan(0);
+    expect(profile![2].distanceKm).toBeGreaterThan(profile![1].distanceKm);
+    expect(profile![2].elevationM).toBe(148);
+  });
+
+  it('back-fills elevation when first point has ele=null', () => {
+    const coords = parseGpxCoords(MIXED_ELE_GPX)!;
+    const profile = buildElevationProfile(coords);
+    expect(profile).not.toBeNull();
+    // first point has no ele — back-filled from first non-null (50)
+    expect(profile![0].elevationM).toBe(50);
+    expect(profile![1].elevationM).toBe(50);
+    expect(profile![2].elevationM).toBe(60);
+  });
+
+  it('forward-fills elevation when middle point has ele=null', () => {
+    const coords: GpxCoord[] = [
+      { lat: 37.5, lon: 127.0, ele: 100 },
+      { lat: 37.501, lon: 127.001, ele: null },
+      { lat: 37.502, lon: 127.002, ele: 200 },
+    ];
+    const profile = buildElevationProfile(coords);
+    expect(profile).not.toBeNull();
+    expect(profile![1].elevationM).toBe(100); // forward-filled
+  });
+
+  it('rounds distanceKm to 2 decimal places', () => {
+    const coords = parseGpxCoords(THREE_POINT_GPX)!;
+    const profile = buildElevationProfile(coords)!;
+    for (const pt of profile) {
+      const str = pt.distanceKm.toString();
+      const decimals = str.includes('.') ? str.split('.')[1].length : 0;
+      expect(decimals).toBeLessThanOrEqual(2);
+    }
   });
 });

@@ -112,3 +112,44 @@ export function normaliseCoordsToSvgPoints(
     })
     .join(' ');
 }
+
+export interface ElevationPoint {
+  distanceKm: number;
+  elevationM: number;
+}
+
+export function buildElevationProfile(coords: GpxCoord[]): ElevationPoint[] | null {
+  if (coords.length < 2) return null;
+  if (!coords.some((c) => c.ele !== null)) return null;
+
+  // Forward-fill from the last known elevation
+  const eles: (number | null)[] = new Array(coords.length).fill(null);
+  let lastKnown: number | null = null;
+
+  for (let i = 0; i < coords.length; i++) {
+    if (coords[i].ele !== null) {
+      lastKnown = coords[i].ele as number;
+    }
+    eles[i] = lastKnown;
+  }
+
+  // Back-fill the leading nulls from the first known elevation
+  const firstKnownIdx = coords.findIndex((c) => c.ele !== null);
+  const backFillValue = coords[firstKnownIdx].ele as number;
+  for (let i = 0; i < firstKnownIdx; i++) {
+    eles[i] = backFillValue;
+  }
+
+  const result: ElevationPoint[] = [];
+  let cumDistM = 0;
+
+  for (let i = 0; i < coords.length; i++) {
+    if (i > 0) {
+      cumDistM += haversineM(coords[i - 1], coords[i]);
+    }
+    const distanceKm = Math.round((cumDistM / 1000) * 100) / 100;
+    result.push({ distanceKm, elevationM: eles[i] as number });
+  }
+
+  return result;
+}
