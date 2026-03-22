@@ -1,14 +1,15 @@
 import { useRef, useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
-import { runInAction, autorun } from 'mobx';
+import { NavigationBar } from '../components/NavigationBar';
+import { runInAction, autorun, reaction } from 'mobx';
 import { Button } from '@/components/ui/button';
 import { Crosshair } from 'lucide-react';
 import { MapStore } from '../stores/MapStore';
 import { GroupMapStore } from '../stores/GroupMapStore';
 import { TrackingStore } from '../stores/TrackingStore';
 import { LeaderboardStore } from '../stores/LeaderboardStore';
-import { parseGpxPoints } from '../utils/routeProjection';
+import { parseGpxPoints, totalRouteDistance } from '../utils/routeProjection';
 import type { Ranking } from '../stores/LeaderboardStore';
 
 export const GroupMapPage = observer(() => {
@@ -24,6 +25,11 @@ export const GroupMapPage = observer(() => {
   const routePoints = useMemo(
     () => (store.gpxText ? parseGpxPoints(store.gpxText) : []),
     [store.gpxText]
+  );
+
+  const totalRouteMeters = useMemo(
+    () => totalRouteDistance(routePoints),
+    [routePoints]
   );
 
   // Effect 1: 데이터 fetch
@@ -85,6 +91,21 @@ export const GroupMapPage = observer(() => {
     return disposer;
   }, [leaderboardStore, mapStore, store]);
 
+  // Effect 8: period broadcast 구독 + 리더보드 재로드
+  useEffect(() => {
+    if (!id || store.group == null) return;
+    const unsubscribe = store.subscribeToPeriodEvents();
+    const disposerEnd = reaction(
+      () => store.periodEndedAt,
+      () => { void leaderboardStore.load(store.periodStartedAt); },
+    );
+    const disposerStart = reaction(
+      () => store.periodStartedAt,
+      (startedAt) => { void leaderboardStore.load(startedAt); },
+    );
+    return () => { unsubscribe(); disposerEnd(); disposerStart(); };
+  }, [id, store, leaderboardStore]);
+
   if (store.group === null) return <Navigate to="/group" replace />;
 
   if (store.group === undefined || store.gpxText === undefined) {
@@ -100,6 +121,31 @@ export const GroupMapPage = observer(() => {
 
   const isAdmin = store.currentUserId === store.group.created_by;
   const bottomOffset = (trackingStore.isTracking || trackingStore.saving) ? 'bottom-36' : 'bottom-20';
+
+  const displayRankings = (() => {
+    if (!trackingStore.isTracking || !store.currentUserId) return leaderboardStore.rankings;
+    const meAlreadyIn = leaderboardStore.rankings.some((r) => r.userId === store.currentUserId);
+    if (meAlreadyIn) return leaderboardStore.rankings;
+    const myEntry: Ranking = {
+      userId: store.currentUserId,
+      displayName: trackingStore.displayName ?? '나',
+      maxRouteMeters: trackingStore.maxRouteMeters,
+      isLive: true,
+      lat: trackingStore.latestLat,
+      lng: trackingStore.latestLng,
+    };
+    return [...leaderboardStore.rankings, myEntry].sort((a, b) => b.maxRouteMeters - a.maxRouteMeters);
+  })();
+
+  const formatProgress = (maxRouteMeters: number) => {
+    if (totalRouteMeters > 0) {
+      const pct = Math.min(100, Math.round((maxRouteMeters / totalRouteMeters) * 100));
+      return `${pct}%`;
+    }
+    return maxRouteMeters >= 1000
+      ? `${(maxRouteMeters / 1000).toFixed(1)}km`
+      : `${Math.round(maxRouteMeters)}m`;
+  };
 
   return (
     <div className="absolute inset-0">
@@ -184,18 +230,38 @@ export const GroupMapPage = observer(() => {
               <p className="text-xs text-neutral-500">속도</p>
             </div>
           </div>
-          <button
-            onClick={() => trackingStore.stop()}
-            onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); trackingStore.stop(); }}
-            disabled={trackingStore.saving}
-            className={`w-full py-2 rounded-xl text-sm font-semibold ${
-              trackingStore.saving
-                ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed'
-                : 'bg-red-500 text-white'
-            }`}
-          >
-            {trackingStore.saving ? '저장 중...' : '■ 중지'}
-          </button>
+          {trackingStore.saving && (
+            <button disabled className="w-full py-2 rounded-xl text-sm font-semibold bg-neutral-300 text-neutral-500 cursor-not-allowed">
+              저장 중...
+            </button>
+          )}
+          {!trackingStore.saving && !trackingStore.isPaused && (
+            <button
+              onClick={() => trackingStore.pause()}
+              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); trackingStore.pause(); }}
+              className="w-full py-2 rounded-xl text-sm font-semibold bg-neutral-400 text-white"
+            >
+              ⏸ 일시정지
+            </button>
+          )}
+          {!trackingStore.saving && trackingStore.isPaused && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => trackingStore.resume()}
+                onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); trackingStore.resume(); }}
+                className="flex-1 py-2 rounded-xl text-sm font-semibold bg-black text-white"
+              >
+                ▶ 재개
+              </button>
+              <button
+                onClick={() => trackingStore.stop()}
+                onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); trackingStore.stop(); }}
+                className="flex-1 py-2 rounded-xl text-sm font-semibold bg-red-500 text-white"
+              >
+                ■ 종료
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -215,7 +281,7 @@ export const GroupMapPage = observer(() => {
                 <div role="status" className="w-5 h-5 border-2 border-neutral-300 border-t-neutral-600 rounded-full animate-spin" />
               </div>
             )}
-            {!leaderboardStore.loading && leaderboardStore.rankings.map((r: Ranking, i: number) => (
+            {!leaderboardStore.loading && displayRankings.map((r: Ranking, i: number) => (
               <div
                 key={r.userId}
                 className={`flex items-center px-4 py-3 border-b border-neutral-100 ${r.userId === store.currentUserId ? 'bg-blue-50' : ''}`}
@@ -223,14 +289,12 @@ export const GroupMapPage = observer(() => {
                 <span className="w-7 font-bold text-base">{i + 1}</span>
                 <span className="flex-1 text-sm font-medium">{r.displayName}</span>
                 <span className="text-xs text-neutral-500 mr-2">
-                  {r.maxRouteMeters >= 1000
-                    ? `${(r.maxRouteMeters / 1000).toFixed(1)}km`
-                    : `${Math.round(r.maxRouteMeters)}m`}
+                  {formatProgress(r.maxRouteMeters)}
                 </span>
                 {r.isLive && <span className="text-xs text-red-500">● 라이브</span>}
               </div>
             ))}
-            {!leaderboardStore.loading && leaderboardStore.rankings.length === 0 && (
+            {!leaderboardStore.loading && displayRankings.length === 0 && (
               <p className="text-center text-sm text-neutral-400 py-8">아직 기록이 없습니다</p>
             )}
           </div>
@@ -248,6 +312,22 @@ export const GroupMapPage = observer(() => {
         </div>
       )}
 
+      <NavigationBar
+        title="그룹 지도"
+        onBack={() => navigate(-1)}
+        overlay
+        rightAction={
+          store.currentUserId && store.group && store.currentUserId === store.group.created_by ? (
+            <a
+              href={`/group/${id}/settings`}
+              aria-label="설정"
+              className="text-hig-headline min-h-0 min-w-0"
+            >
+              ⚙
+            </a>
+          ) : undefined
+        }
+      />
       {/* 칩 탭 */}
       <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10 flex gap-2">
         <button
@@ -263,29 +343,6 @@ export const GroupMapPage = observer(() => {
           🏆 순위
         </button>
       </div>
-
-      {/* 뒤로가기 버튼 */}
-      <div className="absolute top-4 left-4 z-10">
-        <button
-          onClick={() => navigate('/group')}
-          className="bg-white/90 text-black px-3 py-1 rounded-full text-sm font-medium shadow"
-        >
-          ← {store.group.name}
-        </button>
-      </div>
-
-      {/* 설정 버튼 (소유자 전용) */}
-      {store.currentUserId && store.group && store.currentUserId === store.group.created_by && (
-        <div className="absolute top-4 right-4 z-10">
-          <a
-            href={`/group/${id}/settings`}
-            aria-label="설정"
-            className="bg-white/90 text-black px-3 py-1 rounded-full text-sm font-medium shadow"
-          >
-            ⚙ 설정
-          </a>
-        </div>
-      )}
     </div>
   );
 });

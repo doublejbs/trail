@@ -46,6 +46,7 @@ const { mockGroupMapStore } = vi.hoisted(() => ({
     periodEndedAt: null as Date | null,
     startPeriod: vi.fn(),
     endPeriod: vi.fn(),
+    subscribeToPeriodEvents: vi.fn(() => () => {}),
   },
 }));
 
@@ -60,6 +61,7 @@ vi.mock('../stores/GroupMapStore', () => ({
 const { mockTrackingStore } = vi.hoisted(() => ({
   mockTrackingStore: {
     isTracking: false,
+    isPaused: false,
     elapsedSeconds: 0,
     distanceMeters: 0,
     speedKmh: 0,
@@ -70,10 +72,15 @@ const { mockTrackingStore } = vi.hoisted(() => ({
     saveError: null as string | null,
     start: vi.fn(),
     stop: vi.fn(),
+    pause: vi.fn(),
+    resume: vi.fn(),
     addPoint: vi.fn(),
     dispose: vi.fn(),
     maxRouteMeters: 0,
     setRoutePoints: vi.fn(),
+    displayName: null as string | null,
+    latestLat: null as number | null,
+    latestLng: null as number | null,
   },
 }));
 
@@ -123,6 +130,7 @@ describe('GroupMapPage', () => {
     mockGroupMapStore.currentUserId = 'user-1';
     mockGroupMapStore.load.mockReturnValue(() => {});
     mockTrackingStore.isTracking = false;
+    mockTrackingStore.isPaused = false;
     mockTrackingStore.saving = false;
     mockTrackingStore.saveError = null;
     mockTrackingStore.formattedTime = '00:00:00';
@@ -158,18 +166,18 @@ describe('GroupMapPage', () => {
     });
   });
 
-  it('뒤로가기 버튼에 그룹명 표시', async () => {
+  it('뒤로가기 버튼 표시', async () => {
     renderAt('/group/group-uuid-1');
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /한라산 팀/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /뒤로/ })).toBeInTheDocument();
     });
   });
 
-  it('뒤로가기 버튼 클릭 시 navigate("/group") 호출', async () => {
+  it('뒤로가기 버튼 클릭 시 navigate(-1) 호출', async () => {
     renderAt('/group/group-uuid-1');
-    await waitFor(() => screen.getByRole('button', { name: /한라산 팀/ }));
-    fireEvent.click(screen.getByRole('button', { name: /한라산 팀/ }));
-    expect(mockNavigate).toHaveBeenCalledWith('/group');
+    await waitFor(() => screen.getByRole('button', { name: /뒤로/ }));
+    fireEvent.click(screen.getByRole('button', { name: /뒤로/ }));
+    expect(mockNavigate).toHaveBeenCalledWith(-1);
   });
 
   it('지도 로드 후 startWatchingLocation 호출', async () => {
@@ -232,26 +240,29 @@ describe('GroupMapPage', () => {
       });
     });
 
-    it('트래킹 중 — 중지 버튼 표시', async () => {
+    it('트래킹 중 — 일시정지 버튼 표시', async () => {
       mockTrackingStore.isTracking = true;
+      mockTrackingStore.isPaused = false;
       renderAt('/group/group-uuid-1');
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /중지/ })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /일시정지/ })).toBeInTheDocument();
       });
     });
 
-    it('중지 버튼 클릭 시 trackingStore.stop() 호출', async () => {
+    it('일시정지 후 종료 버튼 클릭 시 trackingStore.stop() 호출', async () => {
       mockTrackingStore.isTracking = true;
+      mockTrackingStore.isPaused = true;
       renderAt('/group/group-uuid-1');
-      await waitFor(() => screen.getByRole('button', { name: /중지/ }));
-      fireEvent.click(screen.getByRole('button', { name: /중지/ }));
+      await waitFor(() => screen.getByRole('button', { name: /종료/ }));
+      fireEvent.click(screen.getByRole('button', { name: /종료/ }));
       expect(mockTrackingStore.stop).toHaveBeenCalledOnce();
     });
 
     it('트래킹 중 — 시작 버튼 미표시', async () => {
       mockTrackingStore.isTracking = true;
+      mockTrackingStore.isPaused = false;
       renderAt('/group/group-uuid-1');
-      await waitFor(() => screen.getByRole('button', { name: /중지/ }));
+      await waitFor(() => screen.getByRole('button', { name: /일시정지/ }));
       expect(screen.queryByRole('button', { name: /시작/ })).not.toBeInTheDocument();
     });
 
