@@ -157,6 +157,24 @@ export const CourseUploadPage = observer(() => {
             </div>
           </div>
 
+          {/* Public toggle */}
+          <div className="flex items-center justify-between py-1">
+            <div>
+              <p className="text-sm text-neutral-700">공개 코스</p>
+              <p className="text-xs text-neutral-400">공개하면 다른 사용자도 이 코스를 볼 수 있습니다</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => store.setIsPublic(!store.isPublic)}
+              className={`relative w-11 h-6 rounded-full transition-colors ${store.isPublic ? 'bg-black' : 'bg-neutral-300'}`}
+              aria-label="공개 여부 토글"
+            >
+              <span
+                className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${store.isPublic ? 'translate-x-5' : 'translate-x-0.5'}`}
+              />
+            </button>
+          </div>
+
           {/* Submit */}
           <div className="pt-2">
             <button

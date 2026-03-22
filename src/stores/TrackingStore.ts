@@ -5,6 +5,7 @@ import { haversineMeters, maxRouteProgress } from '../utils/routeProjection';
 
 class TrackingStore {
   public isTracking: boolean = false;
+  public isPaused: boolean = false;
   public elapsedSeconds: number = 0;
   public distanceMeters: number = 0;
   public speedKmh: number = 0;
@@ -15,9 +16,9 @@ class TrackingStore {
   public latestLat: number | null = null;
   public latestLng: number | null = null;
 
+  public displayName: string | null = null;
   private timerId: ReturnType<typeof setInterval> | null = null;
   private _userId: string | null = null;
-  private _displayName: string | null = null;
   private _channel: ReturnType<typeof supabase.channel> | null = null;
   private groupId: string;
   private routePoints: { lat: number; lng: number }[];
@@ -36,36 +37,36 @@ class TrackingStore {
   }
 
   public start(): void {
+    if (this.isTracking) return;
     this._clearTimer();
     this.isTracking = true;
+    this.isPaused = false;
     this.elapsedSeconds = 0;
     this.distanceMeters = 0;
     this.speedKmh = 0;
     this.points = [];
     this.saveError = null;
     this.maxRouteMeters = 0;
-    this.timerId = setInterval(() => {
-      runInAction(() => { this.elapsedSeconds += 1; });
-      if (this._channel && this._userId) {
-        void this._channel.send({
-          type: 'broadcast',
-          event: 'progress',
-          payload: {
-            userId: this._userId,
-            displayName: this._displayName,
-            maxRouteMeters: this.maxRouteMeters,
-            lat: this.latestLat,
-            lng: this.latestLng,
-          },
-        });
-      }
-    }, 1000);
+    this._startTimer();
     void this._initBroadcast();
+  }
+
+  public pause(): void {
+    if (!this.isTracking || this.isPaused) return;
+    this._clearTimer();
+    this.isPaused = true;
+  }
+
+  public resume(): void {
+    if (!this.isTracking || !this.isPaused) return;
+    this.isPaused = false;
+    this._startTimer();
   }
 
   public stop(): void {
     this._clearTimer();
     this.isTracking = false;
+    this.isPaused = false;
     if (this.elapsedSeconds > 0) {
       void this._save();
     }
@@ -81,6 +82,7 @@ class TrackingStore {
 
   public addPoint(lat: number, lng: number): void {
     if (!this.isTracking) return;
+    if (this.isPaused) return;
     const point = { lat, lng, ts: Date.now() };
     if (this.points.length > 0) {
       const prev = this.points[this.points.length - 1];
@@ -113,6 +115,26 @@ class TrackingStore {
     return `${this.speedKmh.toFixed(1)}km/h`;
   }
 
+  private _startTimer(): void {
+    this._clearTimer();
+    this.timerId = setInterval(() => {
+      runInAction(() => { this.elapsedSeconds += 1; });
+      if (this._channel && this._userId) {
+        void this._channel.send({
+          type: 'broadcast',
+          event: 'progress',
+          payload: {
+            userId: this._userId,
+            displayName: this.displayName,
+            maxRouteMeters: this.maxRouteMeters,
+            lat: this.latestLat,
+            lng: this.latestLng,
+          },
+        });
+      }
+    }, 1000);
+  }
+
   private async _initBroadcast(): Promise<void> {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -124,7 +146,7 @@ class TrackingStore {
         .single();
       runInAction(() => {
         this._userId = user.id;
-        this._displayName = profile?.display_name ?? user.email?.split('@')[0] ?? null;
+        this.displayName = profile?.display_name ?? user.email?.split('@')[0] ?? null;
         this._channel = supabase.channel(`group-progress:${this.groupId}`);
         this._channel.subscribe();
       });

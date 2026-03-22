@@ -1,6 +1,7 @@
 import { makeAutoObservable, runInAction, computed } from 'mobx';
 import type { NavigateFunction } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { toast } from 'sonner';
 import type { Group } from '../types/group';
 
 class GroupMapStore {
@@ -15,6 +16,8 @@ class GroupMapStore {
   public get isPeriodActive(): boolean {
     return this.periodStartedAt !== null && this.periodEndedAt === null;
   }
+
+  private _periodChannel: ReturnType<typeof supabase.channel> | null = null;
 
   public constructor(navigate: NavigateFunction) {
     this.navigate = navigate;
@@ -76,16 +79,51 @@ class GroupMapStore {
     return () => { cancelled = true; };
   }
 
+  public subscribeToPeriodEvents(): () => void {
+    const channel = supabase.channel(`group-period:${this.groupId}`, {
+      config: { broadcast: { self: false } },
+    });
+    channel.on('broadcast', { event: 'period_started' }, (msg) => {
+      const { startedAt } = msg.payload as { startedAt: string };
+      runInAction(() => {
+        this.periodStartedAt = new Date(startedAt);
+        this.periodEndedAt = null;
+      });
+      toast('활동이 시작되었습니다');
+    });
+    channel.on('broadcast', { event: 'period_ended' }, () => {
+      runInAction(() => { this.periodEndedAt = new Date(); });
+      toast('활동이 종료되었습니다');
+    });
+    channel.subscribe();
+    this._periodChannel = channel;
+    return () => {
+      if (this._periodChannel) {
+        void supabase.removeChannel(this._periodChannel);
+        this._periodChannel = null;
+      }
+    };
+  }
+
   public async startPeriod(): Promise<void> {
     const now = new Date();
     const { error } = await supabase
       .from('groups')
       .update({ period_started_at: now.toISOString(), period_ended_at: null })
       .eq('id', this.groupId);
-    if (!error) {
-      runInAction(() => {
-        this.periodStartedAt = now;
-        this.periodEndedAt = null;
+    if (error) {
+      toast.error(`활동 시작 실패: ${error.message}`);
+      return;
+    }
+    runInAction(() => {
+      this.periodStartedAt = now;
+      this.periodEndedAt = null;
+    });
+    if (this._periodChannel) {
+      void this._periodChannel.send({
+        type: 'broadcast',
+        event: 'period_started',
+        payload: { startedAt: now.toISOString() },
       });
     }
   }
@@ -98,6 +136,13 @@ class GroupMapStore {
       .eq('id', this.groupId);
     if (!error) {
       runInAction(() => { this.periodEndedAt = now; });
+      if (this._periodChannel) {
+        void this._periodChannel.send({
+          type: 'broadcast',
+          event: 'period_ended',
+          payload: {},
+        });
+      }
     }
   }
 }

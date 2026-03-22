@@ -34,6 +34,20 @@ export function parseGpxPoints(gpxText: string): { lat: number; lng: number }[] 
   }
 }
 
+export function totalRouteDistance(
+  routePoints: { lat: number; lng: number }[]
+): number {
+  if (routePoints.length < 2) return 0;
+  let total = 0;
+  for (let i = 0; i < routePoints.length - 1; i++) {
+    total += haversineMeters(
+      routePoints[i].lat, routePoints[i].lng,
+      routePoints[i + 1].lat, routePoints[i + 1].lng,
+    );
+  }
+  return total;
+}
+
 export function maxRouteProgress(
   trackingPoints: { lat: number; lng: number }[],
   routePoints: { lat: number; lng: number }[]

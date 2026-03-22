@@ -8,6 +8,7 @@ class CourseUploadStore {
   public name: string = '';
   public description: string = '';
   public tags: string[] = [];
+  public isPublic: boolean = true;
   public file: File | null = null;
   public gpxError: string | null = null;
   public submitting: boolean = false;
@@ -21,6 +22,7 @@ class CourseUploadStore {
 
   public setName(v: string): void { this.name = v; }
   public setDescription(v: string): void { this.description = v; }
+  public setIsPublic(v: boolean): void { this.isPublic = v; }
 
   public addTag(tag: string): void {
     if (!this.tags.includes(tag)) this.tags.push(tag);
@@ -103,7 +105,7 @@ class CourseUploadStore {
         gpx_path: path,
         distance_m: distanceM,
         elevation_gain_m: elevationGainM,
-        is_public: true,
+        is_public: this.isPublic,
       });
 
     if (insertError) {
