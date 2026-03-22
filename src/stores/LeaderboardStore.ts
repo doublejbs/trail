@@ -13,15 +13,17 @@ class LeaderboardStore {
   public loading: boolean = false;
   public error: string | null = null;
   private _channel: ReturnType<typeof supabase.channel> | null = null;
+  private groupId: string;
 
-  constructor(private groupId: string) {
+  constructor(groupId: string) {
+    this.groupId = groupId;
     makeAutoObservable(this);
   }
 
   async load(periodStartedAt: Date | null): Promise<void> {
     if (this._channel) {
-      supabase.removeChannel(this._channel);
-      this._channel = null;
+      void supabase.removeChannel(this._channel);
+      runInAction(() => { this._channel = null; });
     }
 
     runInAction(() => { this.loading = true; this.error = null; });
@@ -99,7 +101,7 @@ class LeaderboardStore {
 
   dispose(): void {
     if (this._channel) {
-      supabase.removeChannel(this._channel);
+      void supabase.removeChannel(this._channel);
       this._channel = null;
     }
   }

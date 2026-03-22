@@ -24,7 +24,7 @@ const FAKE_GROUP = {
 vi.mock('../lib/supabase', () => ({
   supabase: {
     auth: { getUser: () => mockGetUser() },
-    from: (table: string) => ({
+    from: (_table: string) => ({
       select: () => ({
         eq: () => ({
           single: () => mockSelect(),

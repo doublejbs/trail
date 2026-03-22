@@ -17,11 +17,15 @@ class TrackingStore {
   private _userId: string | null = null;
   private _displayName: string | null = null;
   private _channel: ReturnType<typeof supabase.channel> | null = null;
+  private groupId: string;
+  private routePoints: { lat: number; lng: number }[];
 
   public constructor(
-    private groupId: string,
-    private routePoints: { lat: number; lng: number }[]
+    groupId: string,
+    routePoints: { lat: number; lng: number }[]
   ) {
+    this.groupId = groupId;
+    this.routePoints = routePoints;
     makeAutoObservable(this);
   }
 
