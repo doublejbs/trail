@@ -6,6 +6,7 @@ import { Heart, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { CourseDetailStore } from '../stores/CourseDetailStore';
 import { MapStore } from '../stores/MapStore';
+import { NavigationBar } from '../components/NavigationBar';
 import { ElevationChart } from '../components/ElevationChart';
 import { supabase } from '../lib/supabase';
 
@@ -96,6 +97,11 @@ export const CourseDetailPage = observer(() => {
     <div className="absolute inset-0 bg-white">
       {/* Map */}
       <div className="absolute inset-x-0 top-0" style={{ height: MAP_HEIGHT }}>
+        <NavigationBar
+          title="코스 상세"
+          onBack={() => navigate(-1)}
+          overlay
+        />
         <div ref={mapRef} data-testid="map-container" className="absolute inset-0 w-full h-full" />
 
         {mapStore.error && (
@@ -103,16 +109,6 @@ export const CourseDetailPage = observer(() => {
             <p className="text-sm text-neutral-500">지도를 불러올 수 없습니다</p>
           </div>
         )}
-
-        {/* Back button */}
-        <div className="absolute top-4 left-4">
-          <button
-            onClick={() => navigate('/course')}
-            className="bg-white/90 text-black px-3 py-1 rounded-full text-sm font-medium shadow"
-          >
-            ← 코스
-          </button>
-        </div>
       </div>
 
       {/* Scrollable detail */}
