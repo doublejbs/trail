@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GroupCreateStore } from './GroupCreateStore';
 
-const { mockGetUser, mockUpload, mockInsert } = vi.hoisted(() => ({
+const { mockGetUser, mockUpload, mockInsert, mockSelect } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockUpload: vi.fn(),
   mockInsert: vi.fn(),
+  mockSelect: vi.fn(),
 }));
 
 vi.mock('../lib/supabase', () => ({
@@ -17,9 +18,20 @@ vi.mock('../lib/supabase', () => ({
         upload: (...args: unknown[]) => mockUpload(...args),
       }),
     },
-    from: () => ({
-      insert: (...args: unknown[]) => mockInsert(...args),
-    }),
+    from: (table: string) => {
+      if (table === 'courses') {
+        const chain = {
+          select: () => chain,
+          order: () => chain,
+          or: (...args: unknown[]) => mockSelect(...args),
+          eq: (...args: unknown[]) => mockSelect(...args),
+        };
+        return chain;
+      }
+      return {
+        insert: (...args: unknown[]) => mockInsert(...args),
+      };
+    },
   },
 }));
 
@@ -40,6 +52,7 @@ describe('GroupCreateStore', () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: FAKE_USER_ID } }, error: null });
     mockUpload.mockResolvedValue({ data: {}, error: null });
     mockInsert.mockResolvedValue({ data: {}, error: null });
+    mockSelect.mockResolvedValue({ data: [], error: null });
     store = new GroupCreateStore(mockNavigate);
   });
 
@@ -60,12 +73,14 @@ describe('GroupCreateStore', () => {
       expect(store.isValid).toBe(false);
     });
 
-    it('file이 null이면 false', () => {
+    it('file이 null이면 false (file 모드)', () => {
+      store.setSourceMode('file');
       store.setName('My Group');
       expect(store.isValid).toBe(false);
     });
 
-    it('name과 file 모두 있으면 true', () => {
+    it('name과 file 모두 있으면 true (file 모드)', () => {
+      store.setSourceMode('file');
       store.setName('My Group');
       store.setFile(new File([''], 'test.gpx'));
       expect(store.isValid).toBe(true);
@@ -76,10 +91,24 @@ describe('GroupCreateStore', () => {
       store.setFile(new File([''], 'test.gpx'));
       expect(store.isValid).toBe(false);
     });
+
+    it('course 모드에서 selectedCourseId 없으면 false', () => {
+      store.setSourceMode('course');
+      store.setName('My Group');
+      expect(store.isValid).toBe(false);
+    });
+
+    it('course 모드에서 name과 selectedCourseId 모두 있으면 true', () => {
+      store.setSourceMode('course');
+      store.setName('My Group');
+      store.setSelectedCourseId('course-id-123');
+      expect(store.isValid).toBe(true);
+    });
   });
 
   describe('submit()', () => {
     beforeEach(() => {
+      store.setSourceMode('file');
       store.setName('테스트 그룹');
       store.setFile(new File(['gpx content'], 'route.gpx'));
     });
