@@ -25,17 +25,10 @@ export const CoursePage = observer(() => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="relative flex flex-col h-full bg-white">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-100">
+      <div className="flex items-center px-4 py-3 border-b border-neutral-100">
         <h1 className="text-base font-semibold">코스</h1>
-        <button
-          onClick={() => navigate('/course/new')}
-          aria-label="코스 업로드"
-          className="flex items-center justify-center w-9 h-9 rounded-full bg-black text-white"
-        >
-          <Plus size={18} />
-        </button>
       </div>
 
       {/* Filter chips */}
@@ -84,6 +77,15 @@ export const CoursePage = observer(() => {
           ))}
         </div>
       </div>
+
+      {/* FAB */}
+      <button
+        onClick={() => navigate('/course/new')}
+        aria-label="코스 업로드"
+        className="absolute right-4 bottom-4 w-12 h-12 bg-black text-white rounded-full flex items-center justify-center shadow-lg active:bg-neutral-800"
+      >
+        <Plus size={22} />
+      </button>
     </div>
   );
 });
