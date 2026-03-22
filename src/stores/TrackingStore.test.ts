@@ -2,12 +2,29 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { runInAction } from 'mobx';
 import { TrackingStore } from './TrackingStore';
 
+const { mockGetUser, mockInsert } = vi.hoisted(() => ({
+  mockGetUser: vi.fn(),
+  mockInsert: vi.fn(),
+}));
+
+vi.mock('../lib/supabase', () => ({
+  supabase: {
+    auth: { getUser: () => mockGetUser() },
+    from: () => ({ insert: (...args: unknown[]) => mockInsert(...args) }),
+  },
+}));
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
+
 describe('TrackingStore', () => {
   let store: TrackingStore;
 
   beforeEach(() => {
     vi.useFakeTimers();
-    store = new TrackingStore();
+    vi.clearAllMocks();
+    store = new TrackingStore('test-group-id');
   });
 
   afterEach(() => {
@@ -165,6 +182,69 @@ describe('TrackingStore', () => {
       store.start();
       runInAction(() => { store.speedKmh = 5.67; });
       expect(store.formattedSpeed).toBe('5.7km/h');
+    });
+  });
+
+  describe('저장 기능', () => {
+    beforeEach(() => {
+      mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null });
+      mockInsert.mockResolvedValue({ error: null });
+    });
+
+    it('stop() 후 elapsedSeconds > 0이면 Supabase INSERT 호출', async () => {
+      store.start();
+      vi.advanceTimersByTime(1000);
+      store.stop();
+      await vi.runAllTimersAsync();
+      expect(mockInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user_id: 'user-1',
+          group_id: 'test-group-id',
+          elapsed_seconds: 1,
+        })
+      );
+    });
+
+    it('stop() 후 elapsedSeconds === 0이면 INSERT 미호출', async () => {
+      store.start();
+      store.stop();
+      await vi.runAllTimersAsync();
+      expect(mockInsert).not.toHaveBeenCalled();
+    });
+
+    it('저장 중 saving === true', async () => {
+      mockInsert.mockImplementation(() => new Promise(() => {})); // 영원히 pending
+      store.start();
+      vi.advanceTimersByTime(1000);
+      store.stop();
+      await Promise.resolve(); // microtask flush
+      expect(store.saving).toBe(true);
+    });
+
+    it('저장 성공 후 saving === false', async () => {
+      store.start();
+      vi.advanceTimersByTime(1000);
+      store.stop();
+      await vi.runAllTimersAsync();
+      expect(store.saving).toBe(false);
+    });
+
+    it('getUser가 null 반환 시 INSERT 미호출', async () => {
+      mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+      store.start();
+      vi.advanceTimersByTime(1000);
+      store.stop();
+      await vi.runAllTimersAsync();
+      expect(mockInsert).not.toHaveBeenCalled();
+    });
+
+    it('INSERT 실패 시 saveError 설정', async () => {
+      mockInsert.mockResolvedValue({ error: { message: '저장 실패' } });
+      store.start();
+      vi.advanceTimersByTime(1000);
+      store.stop();
+      await vi.runAllTimersAsync();
+      expect(store.saveError).toBe('저장 실패');
     });
   });
 });

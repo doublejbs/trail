@@ -1,4 +1,6 @@
 import { makeAutoObservable, runInAction } from 'mobx';
+import { supabase } from '../lib/supabase';
+import { toast } from 'sonner';
 
 function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
@@ -17,10 +19,12 @@ class TrackingStore {
   public distanceMeters: number = 0;
   public speedKmh: number = 0;
   public points: { lat: number; lng: number; ts: number }[] = [];
+  public saving: boolean = false;
+  public saveError: string | null = null;
 
   private timerId: ReturnType<typeof setInterval> | null = null;
 
-  public constructor() {
+  public constructor(private groupId: string) {
     makeAutoObservable(this);
   }
 
@@ -31,6 +35,7 @@ class TrackingStore {
     this.distanceMeters = 0;
     this.speedKmh = 0;
     this.points = [];
+    this.saveError = null;
     this.timerId = setInterval(() => {
       runInAction(() => { this.elapsedSeconds += 1; });
     }, 1000);
@@ -39,6 +44,9 @@ class TrackingStore {
   public stop(): void {
     this._clearTimer();
     this.isTracking = false;
+    if (this.elapsedSeconds > 0) {
+      void this._save();
+    }
   }
 
   public dispose(): void {
@@ -74,6 +82,30 @@ class TrackingStore {
 
   public get formattedSpeed(): string {
     return `${this.speedKmh.toFixed(1)}km/h`;
+  }
+
+  private async _save(): Promise<void> {
+    runInAction(() => { this.saving = true; this.saveError = null; });
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('인증되지 않은 사용자');
+      const { error } = await supabase.from('tracking_sessions').insert({
+        user_id:         user.id,
+        group_id:        this.groupId,
+        elapsed_seconds: this.elapsedSeconds,
+        distance_meters: this.distanceMeters,
+        points:          this.points,
+      });
+      if (error) throw error;
+      runInAction(() => { this.saving = false; });
+      toast.success('기록이 저장되었습니다');
+    } catch (e) {
+      runInAction(() => {
+        this.saving = false;
+        this.saveError = e instanceof Error ? e.message : '저장 실패';
+      });
+      toast.error('기록 저장에 실패했습니다');
+    }
   }
 
   private _clearTimer(): void {
