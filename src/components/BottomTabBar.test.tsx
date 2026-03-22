@@ -23,12 +23,12 @@ const renderBar = (path = '/group') =>
   );
 
 describe('BottomTabBar', () => {
-  it('3개 탭만 렌더링 (기록 없음)', () => {
+  it('4개 탭 렌더링 (그룹, 코스, 기록, 프로필)', () => {
     renderBar('/group');
     expect(screen.getByText('그룹')).toBeInTheDocument();
     expect(screen.getByText('코스')).toBeInTheDocument();
+    expect(screen.getByText('기록')).toBeInTheDocument();
     expect(screen.getByText('프로필')).toBeInTheDocument();
-    expect(screen.queryByText('기록')).not.toBeInTheDocument();
   });
 
   it('/group 경로에서 그룹 탭이 활성', () => {
