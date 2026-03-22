@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { runInAction } from 'mobx';
 import { TrackingStore } from './TrackingStore';
 
 describe('TrackingStore', () => {
@@ -93,6 +94,77 @@ describe('TrackingStore', () => {
 
     it('트래킹 중이 아닐 때 dispose 호출해도 에러 없음', () => {
       expect(() => store.dispose()).not.toThrow();
+    });
+  });
+
+  describe('addPoint()', () => {
+    it('isTracking이 false이면 무시', () => {
+      store.addPoint(37.5, 126.9);
+      expect(store.distanceMeters).toBe(0);
+    });
+
+    it('첫 번째 포인트 — distance 0, speed 0', () => {
+      store.start();
+      store.addPoint(37.5, 126.9);
+      expect(store.distanceMeters).toBe(0);
+      expect(store.speedKmh).toBe(0);
+    });
+
+    it('두 번째 포인트 — distance 누적', () => {
+      store.start();
+      store.addPoint(37.5, 126.9);
+      store.addPoint(37.501, 126.9);
+      expect(store.distanceMeters).toBeGreaterThan(0);
+    });
+
+    it('두 번째 포인트 — speed 계산', () => {
+      store.start();
+      const ts1 = Date.now();
+      vi.setSystemTime(ts1);
+      store.addPoint(37.5, 126.9);
+      vi.setSystemTime(ts1 + 1000);
+      store.addPoint(37.501, 126.9);
+      expect(store.speedKmh).toBeGreaterThan(0);
+    });
+  });
+
+  describe('computed', () => {
+    it('formattedTime — 0초는 "00:00:00"', () => {
+      expect(store.formattedTime).toBe('00:00:00');
+    });
+
+    it('formattedTime — 3661초는 "01:01:01"', () => {
+      store.start();
+      vi.advanceTimersByTime(3661000);
+      expect(store.formattedTime).toBe('01:01:01');
+    });
+
+    it('formattedDistance — 999m는 "999m"', () => {
+      store.start();
+      runInAction(() => { store.distanceMeters = 999; });
+      expect(store.formattedDistance).toBe('999m');
+    });
+
+    it('formattedDistance — 1000m는 "1.0km"', () => {
+      store.start();
+      runInAction(() => { store.distanceMeters = 1000; });
+      expect(store.formattedDistance).toBe('1.0km');
+    });
+
+    it('formattedDistance — 1500m는 "1.5km"', () => {
+      store.start();
+      runInAction(() => { store.distanceMeters = 1500; });
+      expect(store.formattedDistance).toBe('1.5km');
+    });
+
+    it('formattedSpeed — "0.0km/h"', () => {
+      expect(store.formattedSpeed).toBe('0.0km/h');
+    });
+
+    it('formattedSpeed — speedKmh 반영', () => {
+      store.start();
+      runInAction(() => { store.speedKmh = 5.67; });
+      expect(store.formattedSpeed).toBe('5.7km/h');
     });
   });
 });
