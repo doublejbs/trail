@@ -314,20 +314,29 @@ describe('TrackingStore', () => {
 
     it('start() 후 _initBroadcast가 채널 구독', async () => {
       store.start();
-      await vi.runAllTimersAsync();
+      // Flush _initBroadcast promises (2 awaits: getUser + profileSelect + runInAction)
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
       expect(mockChannelSubscribe).toHaveBeenCalled();
     });
 
     it('1초 후 채널로 broadcast 전송', async () => {
       store.start();
-      await vi.runAllTimersAsync();
+      // Flush _initBroadcast promises
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
       vi.advanceTimersByTime(1000);
       expect(mockChannelSend).toHaveBeenCalled();
     });
 
     it('dispose() 시 채널 제거', async () => {
       store.start();
-      await vi.runAllTimersAsync();
+      // Flush _initBroadcast promises
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
       store.dispose();
       expect(mockRemoveChannel).toHaveBeenCalled();
     });
@@ -335,7 +344,10 @@ describe('TrackingStore', () => {
     it('미인증 시 broadcast 미전송', async () => {
       mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
       store.start();
-      await vi.runAllTimersAsync();
+      // Flush _initBroadcast promises
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
       vi.advanceTimersByTime(1000);
       expect(mockChannelSend).not.toHaveBeenCalled();
     });

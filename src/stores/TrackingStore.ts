@@ -5,8 +5,7 @@ import { haversineMeters, maxRouteProgress } from '../utils/routeProjection';
 
 class TrackingStore {
   public isTracking: boolean = false;
-  private _startedAt: number | null = null;
-  private _pausedElapsed: number = 0;
+  public elapsedSeconds: number = 0;
   public distanceMeters: number = 0;
   public speedKmh: number = 0;
   public points: { lat: number; lng: number; ts: number }[] = [];
@@ -14,26 +13,16 @@ class TrackingStore {
   public saveError: string | null = null;
   public maxRouteMeters: number = 0;
 
+  private timerId: ReturnType<typeof setInterval> | null = null;
   private _userId: string | null = null;
   private _displayName: string | null = null;
   private _channel: ReturnType<typeof supabase.channel> | null = null;
-  // timerId is kept for compatibility (dispose pattern), but not used for elapsedSeconds
-  private timerId: ReturnType<typeof setInterval> | null = null;
 
   public constructor(
     private groupId: string,
     private routePoints: { lat: number; lng: number }[]
   ) {
-    makeAutoObservable(this, {
-      elapsedSeconds: false,
-    });
-  }
-
-  public get elapsedSeconds(): number {
-    if (!this.isTracking || this._startedAt === null) {
-      return this._pausedElapsed;
-    }
-    return this._pausedElapsed + Math.floor((Date.now() - this._startedAt) / 1000);
+    makeAutoObservable(this);
   }
 
   public setRoutePoints(points: { lat: number; lng: number }[]): void {
@@ -42,39 +31,40 @@ class TrackingStore {
 
   public start(): void {
     this._clearTimer();
-    runInAction(() => {
-      this.isTracking = true;
-      this._startedAt = Date.now();
-      this._pausedElapsed = 0;
-      this.distanceMeters = 0;
-      this.speedKmh = 0;
-      this.points = [];
-      this.saveError = null;
-      this.maxRouteMeters = 0;
-    });
+    this.isTracking = true;
+    this.elapsedSeconds = 0;
+    this.distanceMeters = 0;
+    this.speedKmh = 0;
+    this.points = [];
+    this.saveError = null;
+    this.maxRouteMeters = 0;
+    this.timerId = setInterval(() => {
+      runInAction(() => { this.elapsedSeconds += 1; });
+      if (this._channel && this._userId) {
+        void this._channel.send({
+          type: 'broadcast',
+          event: 'progress',
+          payload: {
+            userId: this._userId,
+            displayName: this._displayName,
+            maxRouteMeters: this.maxRouteMeters,
+          },
+        });
+      }
+    }, 1000);
     void this._initBroadcast();
   }
 
   public stop(): void {
     this._clearTimer();
-    const elapsed = this.elapsedSeconds;
-    runInAction(() => {
-      this.isTracking = false;
-      this._pausedElapsed = elapsed;
-      this._startedAt = null;
-    });
-    if (elapsed > 0) {
+    this.isTracking = false;
+    if (this.elapsedSeconds > 0) {
       void this._save();
     }
   }
 
   public dispose(): void {
     this._clearTimer();
-    const elapsed = this.elapsedSeconds;
-    runInAction(() => {
-      this._pausedElapsed = elapsed;
-      this._startedAt = null;
-    });
     if (this._channel) {
       void supabase.removeChannel(this._channel);
       runInAction(() => { this._channel = null; });
@@ -96,10 +86,9 @@ class TrackingStore {
   }
 
   public get formattedTime(): string {
-    const total = this.elapsedSeconds;
-    const h = Math.floor(total / 3600);
-    const m = Math.floor((total % 3600) / 60);
-    const s = total % 60;
+    const h = Math.floor(this.elapsedSeconds / 3600);
+    const m = Math.floor((this.elapsedSeconds % 3600) / 60);
+    const s = this.elapsedSeconds % 60;
     return [h, m, s].map((v) => String(v).padStart(2, '0')).join(':');
   }
 
@@ -129,28 +118,9 @@ class TrackingStore {
         this._channel = supabase.channel(`group-progress:${this.groupId}`);
         this._channel.subscribe();
       });
-      // Schedule first broadcast tick (one-shot; real apps would reschedule)
-      this._scheduleBroadcastTick();
     } catch {
       // broadcast 실패 시 silent — tracking 자체는 계속
     }
-  }
-
-  private _scheduleBroadcastTick(): void {
-    if (!this.isTracking || !this._channel || !this._userId) return;
-    setTimeout(() => {
-      if (this._channel && this._userId && this.isTracking) {
-        void this._channel.send({
-          type: 'broadcast',
-          event: 'progress',
-          payload: {
-            userId: this._userId,
-            displayName: this._displayName,
-            maxRouteMeters: this.maxRouteMeters,
-          },
-        });
-      }
-    }, 1000);
   }
 
   private async _save(): Promise<void> {
