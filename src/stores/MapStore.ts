@@ -17,6 +17,7 @@ class MapStore {
 
   private watchId: number | null = null;
   private lastPosition: { latitude: number; longitude: number } | null = null;
+  private _memberMarkers: Map<string, naver.maps.Marker> = new Map();
 
   public constructor() {
     makeAutoObservable(this, {
@@ -181,9 +182,35 @@ class MapStore {
     this.endMarker = null;
   }
 
+  public updateMemberMarker(userId: string, displayName: string, lat: number, lng: number): void {
+    if (!this.map) return;
+    const latLng = new window.naver.maps.LatLng(lat, lng);
+    const existing = this._memberMarkers.get(userId);
+    if (existing) {
+      existing.setPosition(latLng);
+    } else {
+      const initial = displayName.charAt(0).toUpperCase() || '?';
+      const marker = new window.naver.maps.Marker({
+        map: this.map,
+        position: latLng,
+        icon: {
+          content: `<div style="display:flex;flex-direction:column;align-items:center;gap:2px"><div style="background:#FF6B35;color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3)">${initial}</div><div style="background:rgba(0,0,0,0.7);color:white;border-radius:4px;padding:1px 4px;font-size:10px;white-space:nowrap;max-width:60px;overflow:hidden;text-overflow:ellipsis">${displayName}</div></div>`,
+          anchor: new window.naver.maps.Point(14, 14),
+        },
+      });
+      this._memberMarkers.set(userId, marker);
+    }
+  }
+
+  public clearMemberMarkers(): void {
+    this._memberMarkers.forEach((marker) => marker.setMap(null));
+    this._memberMarkers.clear();
+  }
+
   public destroy(): void {
     this.stopWatchingLocation();
     this.clearGpxRoute();
+    this.clearMemberMarkers();
     this.map?.destroy();
     this.map = null;
   }

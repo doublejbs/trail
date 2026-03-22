@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Users, Map, User } from 'lucide-react';
+import { Users, Map, History, User } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 interface Tab {
@@ -11,6 +11,7 @@ interface Tab {
 const TABS: Tab[] = [
   { path: '/group', label: '그룹', icon: <Users size={20} strokeWidth={2} /> },
   { path: '/course', label: '코스', icon: <Map size={20} strokeWidth={2} /> },
+  { path: '/history', label: '기록', icon: <History size={20} strokeWidth={2} /> },
   { path: '/profile', label: '프로필', icon: <User size={20} strokeWidth={2} /> },
 ];
 

@@ -1,0 +1,67 @@
+<h2>타이포그래피 스케일</h2>
+<p class="subtitle">현재(암묵적) vs HIG 기반 명시적 스케일 비교 — Geist Variable 유지</p>
+
+<div class="split">
+
+  <!-- 현재 -->
+  <div class="mockup">
+    <div class="mockup-header">현재 (암묵적, 일관성 없음)</div>
+    <div class="mockup-body" style="font-family:'Geist Variable',sans-serif; padding:16px; display:flex; flex-direction:column; gap:10px;">
+      <div style="font-size:16px; font-weight:700; color:#111;">그룹 (text-base font-bold)</div>
+      <div style="font-size:14px; font-weight:500; color:#111;">등산 모임 (text-sm font-medium)</div>
+      <div style="font-size:14px; font-weight:400; color:#111;">참여중인 그룹 (text-sm)</div>
+      <div style="font-size:12px; font-weight:400; color:#737373;">아직 만든 그룹이 없습니다 (text-xs text-neutral-400 — 실제로 text-sm)</div>
+      <div style="font-size:13px; font-weight:400; color:#737373;">그룹을 불러올 수 없습니다 (text-sm text-neutral-400)</div>
+      <hr style="border:none; border-top:1px solid #eee; margin:4px 0"/>
+      <div style="font-size:11px; color:#999;">→ 페이지마다 크기가 다르고 일관성 없음</div>
+      <div style="font-size:11px; color:#999;">→ 시맨틱 이름 없이 text-sm, text-xs 혼용</div>
+    </div>
+  </div>
+
+  <!-- HIG 기반 -->
+  <div class="mockup">
+    <div class="mockup-header">HIG 기반 (명시적 스케일)</div>
+    <div class="mockup-body" style="font-family:'Geist Variable',sans-serif; padding:16px; display:flex; flex-direction:column; gap:8px;">
+      <div style="font-size:28px; font-weight:700; letter-spacing:-0.5px; color:#111; line-height:1.2;">28 / Bold — Title 1</div>
+      <div style="font-size:22px; font-weight:700; letter-spacing:-0.3px; color:#111; line-height:1.25;">22 / Bold — Title 2</div>
+      <div style="font-size:20px; font-weight:600; color:#111; line-height:1.3;">20 / Semibold — Title 3</div>
+      <div style="font-size:17px; font-weight:600; color:#111; line-height:1.35;">17 / Semibold — Headline</div>
+      <div style="font-size:17px; font-weight:400; color:#111; line-height:1.5;">17 / Regular — Body</div>
+      <div style="font-size:15px; font-weight:400; color:#555; line-height:1.45;">15 / Regular — Subheadline</div>
+      <div style="font-size:13px; font-weight:400; color:#777; line-height:1.4;">13 / Regular — Footnote</div>
+      <div style="font-size:12px; font-weight:400; color:#999; line-height:1.35;">12 / Regular — Caption</div>
+      <hr style="border:none; border-top:1px solid #eee; margin:4px 0"/>
+      <div style="font-size:11px; color:#999;">→ CSS 변수로 정의: --text-body, --text-headline 등</div>
+      <div style="font-size:11px; color:#999;">→ letter-spacing도 함께 지정</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="section" style="margin-top:24px;">
+  <h3>실제 앱 화면 적용 예시</h3>
+  <div class="split">
+    <!-- 그룹 페이지 현재 -->
+    <div class="mockup">
+      <div class="mockup-header">GroupPage 현재</div>
+      <div class="mockup-body" style="font-family:'Geist Variable',sans-serif; background:#fff; overflow:hidden;">
+        <div style="padding:12px 16px 8px; font-size:16px; font-weight:700; border-bottom:1px solid #eee; color:#111;">그룹</div>
+        <div style="padding:14px 16px; border-bottom:1px solid #f0f0f0; font-size:14px; color:#111;">등산 모임 🏔️</div>
+        <div style="padding:14px 16px; border-bottom:1px solid #f0f0f0; font-size:14px; color:#111;">주말 라이딩 🚴</div>
+        <div style="padding:14px 16px; font-size:14px; color:#111;">한강 러닝 크루 🏃</div>
+      </div>
+    </div>
+    <!-- 그룹 페이지 HIG -->
+    <div class="mockup">
+      <div class="mockup-header">GroupPage HIG 적용</div>
+      <div class="mockup-body" style="font-family:'Geist Variable',sans-serif; background:#fff; overflow:hidden;">
+        <div style="padding:12px 16px 8px; font-size:28px; font-weight:700; letter-spacing:-0.5px; color:#111; line-height:1.2;">그룹</div>
+        <div style="padding:14px 16px; border-bottom:1px solid #f0f0f0; font-size:17px; color:#111; font-weight:400;">등산 모임 🏔️</div>
+        <div style="padding:14px 16px; border-bottom:1px solid #f0f0f0; font-size:17px; color:#111; font-weight:400;">주말 라이딩 🚴</div>
+        <div style="padding:14px 16px; font-size:17px; color:#111;">한강 러닝 크루 🏃</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px;">어떻게 보이나요? 터미널에서 의견 주세요.</p>

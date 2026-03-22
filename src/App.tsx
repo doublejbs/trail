@@ -11,6 +11,7 @@ import { CoursePage } from './pages/CoursePage';
 import { CourseUploadPage } from './pages/CourseUploadPage';
 import { CourseDetailPage } from './pages/CourseDetailPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { HistoryPage } from './pages/HistoryPage';
 import { InvitePage } from './pages/InvitePage';
 
 export default function App() {
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="course" element={<CoursePage />} />
           <Route path="course/new" element={<CourseUploadPage />} />
           <Route path="course/:id" element={<CourseDetailPage />} />
+          <Route path="history" element={<HistoryPage />} />
           <Route path="profile" element={<ProfilePage />} />
         </Route>
       </Routes>

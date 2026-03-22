@@ -12,6 +12,8 @@ class TrackingStore {
   public saving: boolean = false;
   public saveError: string | null = null;
   public maxRouteMeters: number = 0;
+  public latestLat: number | null = null;
+  public latestLng: number | null = null;
 
   private timerId: ReturnType<typeof setInterval> | null = null;
   private _userId: string | null = null;
@@ -52,6 +54,8 @@ class TrackingStore {
             userId: this._userId,
             displayName: this._displayName,
             maxRouteMeters: this.maxRouteMeters,
+            lat: this.latestLat,
+            lng: this.latestLng,
           },
         });
       }
@@ -86,6 +90,8 @@ class TrackingStore {
       this.speedKmh = dtHours > 0 ? (meters / 1000) / dtHours : 0;
     }
     this.points.push(point);
+    this.latestLat = lat;
+    this.latestLng = lng;
     this.maxRouteMeters = maxRouteProgress(this.points, this.routePoints);
   }
 

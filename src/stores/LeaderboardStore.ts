@@ -6,6 +6,8 @@ interface Ranking {
   displayName: string;
   maxRouteMeters: number;
   isLive: boolean;
+  lat: number | null;
+  lng: number | null;
 }
 
 class LeaderboardStore {
@@ -64,6 +66,8 @@ class LeaderboardStore {
             displayName: nameMap.get(userId) ?? '알 수 없음',
             maxRouteMeters,
             isLive: false,
+            lat: null,
+            lng: null,
           }))
           .sort((a, b) => b.maxRouteMeters - a.maxRouteMeters);
         this.loading = false;
@@ -78,10 +82,12 @@ class LeaderboardStore {
 
     const channel = supabase.channel(`group-progress:${this.groupId}`);
     channel.on('broadcast', { event: 'progress' }, (msg) => {
-      const { userId, displayName, maxRouteMeters } = msg.payload as {
+      const { userId, displayName, maxRouteMeters, lat, lng } = msg.payload as {
         userId: string;
         displayName: string;
         maxRouteMeters: number;
+        lat: number | null;
+        lng: number | null;
       };
       runInAction(() => {
         const existing = this.rankings.find((r) => r.userId === userId);
@@ -89,8 +95,10 @@ class LeaderboardStore {
           existing.maxRouteMeters = maxRouteMeters;
           if (existing.displayName === '알 수 없음') existing.displayName = displayName;
           existing.isLive = true;
+          if (lat != null) existing.lat = lat;
+          if (lng != null) existing.lng = lng;
         } else {
-          this.rankings.push({ userId, displayName, maxRouteMeters, isLive: true });
+          this.rankings.push({ userId, displayName, maxRouteMeters, isLive: true, lat, lng });
         }
         this.rankings.sort((a, b) => b.maxRouteMeters - a.maxRouteMeters);
       });

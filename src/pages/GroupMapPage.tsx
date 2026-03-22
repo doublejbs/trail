@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
-import { runInAction } from 'mobx';
+import { runInAction, autorun } from 'mobx';
 import { Button } from '@/components/ui/button';
 import { Crosshair } from 'lucide-react';
 import { MapStore } from '../stores/MapStore';
@@ -71,6 +71,19 @@ export const GroupMapPage = observer(() => {
   useEffect(() => {
     return () => { leaderboardStore.dispose(); };
   }, [leaderboardStore]);
+
+  // Effect 7: 다른 멤버 위치 마커 갱신
+  useEffect(() => {
+    const disposer = autorun(() => {
+      leaderboardStore.rankings.forEach((r) => {
+        if (r.userId === store.currentUserId) return;
+        if (r.lat != null && r.lng != null) {
+          mapStore.updateMemberMarker(r.userId, r.displayName, r.lat, r.lng);
+        }
+      });
+    });
+    return disposer;
+  }, [leaderboardStore, mapStore, store]);
 
   if (store.group === null) return <Navigate to="/group" replace />;
 
