@@ -51,7 +51,7 @@ export function BottomTabBar() {
                 {tab.icon}
               </span>
               <span
-                className={`text-[10px] leading-none tracking-tight transition-all duration-200 ${
+                className={`text-hig-caption leading-none tracking-tight transition-all duration-200 ${
                   active ? 'text-white font-semibold' : 'text-white/40 font-normal'
                 }`}
               >
