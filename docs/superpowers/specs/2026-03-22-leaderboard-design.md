@@ -13,7 +13,7 @@ Group admins start and end an activity period from the group map page. During th
 
 **New table: `profiles`**
 ```sql
-CREATE TABLE profiles (
+CREATE TABLE IF NOT EXISTS profiles (
   id           UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   display_name TEXT NOT NULL,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -113,7 +113,9 @@ New public state:
 2. `void this._initBroadcast()` 로 fire-and-forget 비동기 초기화 시작.
 
 **새 private 메서드 `_initBroadcast()`:**
-`_userId`, `_displayName`, `_channel`은 `makeAutoObservable`의 영향을 받으므로 비동기 완료 후 할당은 `runInAction`으로 감싼다:
+`_userId`, `_displayName`, `_channel`은 `makeAutoObservable`의 영향을 받으므로 비동기 완료 후 할당은 `runInAction`으로 감싼다.
+
+Supabase JS v2에서 `channel.subscribe()`는 Promise를 반환하지 않음 — `await` 불필요. 콜백 없이 호출하고 채널을 즉시 할당:
 ```typescript
 private async _initBroadcast(): Promise<void> {
   try {
@@ -121,12 +123,11 @@ private async _initBroadcast(): Promise<void> {
     if (!user) return; // 미인증 시 broadcast 없이 종료
     const { data: profile } = await supabase
       .from('profiles').select('display_name').eq('id', user.id).single();
-    const channel = supabase.channel(`group-progress:${this.groupId}`);
-    await channel.subscribe();
     runInAction(() => {
       this._userId = user.id;
       this._displayName = profile?.display_name ?? user.email?.split('@')[0] ?? null;
-      this._channel = channel;
+      this._channel = supabase.channel(`group-progress:${this.groupId}`);
+      this._channel.subscribe(); // fire-and-forget, no await
     });
   } catch {
     // broadcast 실패 시 silent — tracking 자체는 계속
@@ -223,16 +224,24 @@ State:
      : { data: [] };
    const nameMap = new Map(profiles?.map(p => [p.id, p.display_name]) ?? []);
    ```
-3. Set `rankings` from aggregated result (`isLive: false`):
-   - `displayName`: `nameMap.get(userId) ?? '알 수 없음'`
-   - Sorted by `maxRouteMeters DESC`
-4. Set `loading = false`. (Realtime 구독은 비동기로 이후 완료 — 의도적으로 로딩 완료로 처리)
-5. Subscribe to Supabase Realtime channel `group-progress:{groupId}` for `progress` broadcast events (독립 채널 인스턴스). 저장: `this._channel = channel`.
-6. On each broadcast `{ userId, displayName, maxRouteMeters }`: upsert into `rankings` by `userId`:
+3. `runInAction`으로 감싸 rankings 설정:
+   ```typescript
+   runInAction(() => {
+     this.rankings = [...maxByUser.entries()].map(([userId, meters]) => ({
+       userId,
+       displayName: nameMap.get(userId) ?? '알 수 없음',
+       maxRouteMeters: meters,
+       isLive: false,
+     })).sort((a, b) => b.maxRouteMeters - a.maxRouteMeters);
+     this.loading = false; // Realtime 구독은 비동기로 이후 완료 — 의도적으로 로딩 완료 처리
+   });
+   ```
+4. Subscribe to Supabase Realtime channel `group-progress:{groupId}` for `progress` broadcast events (독립 채널 인스턴스). 저장: `this._channel = channel`. (`channel.subscribe()` — `await` 불필요)
+6. On each broadcast `{ userId, displayName, maxRouteMeters }`: `runInAction`으로 감싸 upsert:
    - `maxRouteMeters`: broadcast 값으로 교체
-   - `displayName`: 이미 DB에서 로드된 이름이 있으면 유지, "알 수 없음"이면 broadcast 값으로 교체
+   - `displayName`: 기존 이름이 "알 수 없음"이면 broadcast 값으로 교체, 그 외 유지
    - `isLive: true`
-7. Re-sort `rankings` by `maxRouteMeters DESC`.
+   - Re-sort by `maxRouteMeters DESC`
 
 **`dispose()`:**
 ```typescript
@@ -262,7 +271,7 @@ dispose(): void {
    }, [trackingStore, routePoints]);
    ```
 3. **LeaderboardStore:** `useState(() => new LeaderboardStore(id!))`
-4. **`useEffect` for leaderboard load:** `store.gpxText`와 `store.group`이 모두 `undefined`가 아닌 시점(로드 완료)에 `leaderboardStore.load(store.periodStartedAt ?? null)` 호출. `periodStartedAt`이 null이면 기간 필터 없이 전체 조회:
+4. **`useEffect` for leaderboard load:** `store.group`과 `store.gpxText`가 로드 완료된 후, `store.periodStartedAt`이 변경될 때마다 `leaderboardStore.load()` 재호출 (의도적 — `startPeriod()` 시 새 기간으로 순위 재조회):
    ```typescript
    useEffect(() => {
      if (store.group !== undefined && store.gpxText !== undefined) {
@@ -270,6 +279,7 @@ dispose(): void {
      }
    }, [leaderboardStore, store.group, store.gpxText, store.periodStartedAt]);
    ```
+   `load()` 첫 단계에서 기존 채널을 정리하므로 재호출 시 중복 구독 없음.
 5. **Chip tabs:** `activeTab: 'map' | 'leaderboard'`, 초기값 `'map'`
 6. **Admin period buttons:**
    - `!store.isPeriodActive` → green "▶ 활동 시작" (지도 탭에서 표시)
@@ -326,7 +336,7 @@ Display name fallback order in leaderboard (client-side):
 | `src/utils/routeProjection.ts` | New — parseGpxPoints + maxRouteProgress |
 | `src/stores/LeaderboardStore.ts` | New — rankings state, Realtime + DB |
 | `src/stores/TrackingStore.ts` | routePoints param + setRoutePoints(), maxRouteMeters, _initBroadcast(), _save() max_route_meters |
-| `src/stores/TrackingStore.test.ts` | 생성자 인자 `(groupId, [])` 로 업데이트, 새 기능 테스트 추가 |
+| `src/stores/TrackingStore.test.ts` | 생성자 인자 `(groupId, [])` 로 업데이트; `supabase` mock에 `from('profiles')` 체인 추가; `supabase.channel()` mock 추가 (`subscribe`, `send`, `removeChannel`); `_initBroadcast()` + `maxRouteMeters` + `setRoutePoints()` 테스트 추가 |
 | `src/stores/GroupMapStore.ts` | period state + startPeriod/endPeriod |
 | `src/types/group.ts` | Group 인터페이스에 `period_started_at`, `period_ended_at` 추가 |
 | `src/pages/GroupMapPage.tsx` | Chip tabs, admin buttons, LeaderboardStore, routePoints memo |
