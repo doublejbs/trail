@@ -3,6 +3,7 @@ import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { NavigationBar } from '../components/NavigationBar';
 import { GroupSettingsStore } from '../stores/GroupSettingsStore';
 
 export const GroupSettingsPage = observer(() => {
@@ -53,16 +54,10 @@ export const GroupSettingsPage = observer(() => {
 
   return (
     <div className="absolute inset-0 overflow-y-auto bg-white">
-      {/* Header */}
-      <div className="flex items-center px-4 py-4 border-b border-neutral-200">
-        <button
-          onClick={() => navigate(`/group/${id}`)}
-          className="text-sm text-neutral-500 mr-3"
-        >
-          ←
-        </button>
-        <h1 className="text-base font-semibold">{store.group.name} 설정</h1>
-      </div>
+      <NavigationBar
+        title={`${store.group.name} 설정`}
+        onBack={() => navigate(-1)}
+      />
 
       <div className="px-4 py-6 flex flex-col gap-8">
         {/* Invite Link Section */}
