@@ -50,6 +50,26 @@ vi.mock('../stores/GroupMapStore', () => ({
   GroupMapStore: vi.fn(function () { return mockGroupMapStore; }),
 }));
 
+const { mockTrackingStore } = vi.hoisted(() => ({
+  mockTrackingStore: {
+    isTracking: false,
+    elapsedSeconds: 0,
+    distanceMeters: 0,
+    speedKmh: 0,
+    formattedTime: '00:00:00',
+    formattedDistance: '0m',
+    formattedSpeed: '0.0km/h',
+    start: vi.fn(),
+    stop: vi.fn(),
+    addPoint: vi.fn(),
+    dispose: vi.fn(),
+  },
+}));
+
+vi.mock('../stores/TrackingStore', () => ({
+  TrackingStore: vi.fn(function () { return mockTrackingStore; }),
+}));
+
 vi.mock('react-router-dom', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-router-dom')>();
   return {
@@ -77,6 +97,10 @@ describe('GroupMapPage', () => {
     mockGroupMapStore.gpxText = FAKE_GPX;
     mockGroupMapStore.currentUserId = 'user-1';
     mockGroupMapStore.load.mockReturnValue(() => {});
+    mockTrackingStore.isTracking = false;
+    mockTrackingStore.formattedTime = '00:00:00';
+    mockTrackingStore.formattedDistance = '0m';
+    mockTrackingStore.formattedSpeed = '0.0km/h';
   });
 
   it('그룹을 찾지 못하면 /group으로 리다이렉트', async () => {
@@ -144,6 +168,58 @@ describe('GroupMapPage', () => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument();
       });
       expect(screen.queryByRole('link', { name: /설정/i })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('트래킹 UI', () => {
+    it('트래킹 전 — 시작 버튼 표시', async () => {
+      renderAt('/group/group-uuid-1');
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /시작/ })).toBeInTheDocument();
+      });
+    });
+
+    it('시작 버튼 클릭 시 trackingStore.start() 호출', async () => {
+      renderAt('/group/group-uuid-1');
+      await waitFor(() => screen.getByRole('button', { name: /시작/ }));
+      fireEvent.click(screen.getByRole('button', { name: /시작/ }));
+      expect(mockTrackingStore.start).toHaveBeenCalledOnce();
+    });
+
+    it('트래킹 중 — 통계 패널 표시', async () => {
+      mockTrackingStore.isTracking = true;
+      mockTrackingStore.formattedTime = '00:01:23';
+      mockTrackingStore.formattedDistance = '250m';
+      mockTrackingStore.formattedSpeed = '3.5km/h';
+      renderAt('/group/group-uuid-1');
+      await waitFor(() => {
+        expect(screen.getByText('00:01:23')).toBeInTheDocument();
+        expect(screen.getByText('250m')).toBeInTheDocument();
+        expect(screen.getByText('3.5km/h')).toBeInTheDocument();
+      });
+    });
+
+    it('트래킹 중 — 중지 버튼 표시', async () => {
+      mockTrackingStore.isTracking = true;
+      renderAt('/group/group-uuid-1');
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /중지/ })).toBeInTheDocument();
+      });
+    });
+
+    it('중지 버튼 클릭 시 trackingStore.stop() 호출', async () => {
+      mockTrackingStore.isTracking = true;
+      renderAt('/group/group-uuid-1');
+      await waitFor(() => screen.getByRole('button', { name: /중지/ }));
+      fireEvent.click(screen.getByRole('button', { name: /중지/ }));
+      expect(mockTrackingStore.stop).toHaveBeenCalledOnce();
+    });
+
+    it('트래킹 중 — 시작 버튼 미표시', async () => {
+      mockTrackingStore.isTracking = true;
+      renderAt('/group/group-uuid-1');
+      await waitFor(() => screen.getByRole('button', { name: /중지/ }));
+      expect(screen.queryByRole('button', { name: /시작/ })).not.toBeInTheDocument();
     });
   });
 

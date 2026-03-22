@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Crosshair } from 'lucide-react';
 import { MapStore } from '../stores/MapStore';
 import { GroupMapStore } from '../stores/GroupMapStore';
+import { TrackingStore } from '../stores/TrackingStore';
 
 export const GroupMapPage = observer(() => {
   const { id } = useParams();
@@ -13,6 +14,7 @@ export const GroupMapPage = observer(() => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapStore] = useState(() => new MapStore());
   const [store] = useState(() => new GroupMapStore(navigate));
+  const [trackingStore] = useState(() => new TrackingStore());
 
   // Effect 1: 데이터 fetch
   useEffect(() => {
@@ -27,7 +29,7 @@ export const GroupMapPage = observer(() => {
     }
 
     mapStore.initMap(mapRef.current);
-    mapStore.startWatchingLocation(); // initMap 실패 시(map === null) 자동 no-op
+    mapStore.startWatchingLocation((lat, lng) => trackingStore.addPoint(lat, lng));
 
     if (store.gpxText !== null) {
       mapStore.drawGpxRoute(store.gpxText);
@@ -36,7 +38,12 @@ export const GroupMapPage = observer(() => {
     }
 
     return () => { mapStore.destroy(); };
-  }, [mapStore, store.gpxText, store.group]);
+  }, [mapStore, trackingStore, store.gpxText, store.group]);
+
+  // Effect 3: TrackingStore 정리
+  useEffect(() => {
+    return () => { trackingStore.dispose(); };
+  }, [trackingStore]);
 
   if (store.group === null) return <Navigate to="/group" replace />;
 
@@ -50,6 +57,8 @@ export const GroupMapPage = observer(() => {
       </div>
     );
   }
+
+  const bottomOffset = trackingStore.isTracking ? 'bottom-36' : 'bottom-20';
 
   return (
     <div className="absolute inset-0">
@@ -69,7 +78,7 @@ export const GroupMapPage = observer(() => {
 
       {/* 코스로 돌아가기 버튼 */}
       {mapStore.map && !mapStore.isCourseVisible && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2">
+        <div className={`absolute ${bottomOffset} left-1/2 -translate-x-1/2 z-10`}>
           <button
             onClick={() => mapStore.returnToCourse()}
             className="bg-white/90 text-black px-4 py-2 rounded-full text-sm font-medium shadow-md whitespace-nowrap"
@@ -81,11 +90,12 @@ export const GroupMapPage = observer(() => {
 
       {/* 내 위치 버튼 */}
       {mapStore.map && (
-        <div className="absolute right-3 bottom-3">
+        <div className={`absolute right-3 ${bottomOffset} z-10`}>
           <Button
             variant="secondary"
             size="icon"
             onClick={() => mapStore.locate()}
+            onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); mapStore.locate(); }}
             aria-label="내 위치"
             className="bg-white hover:bg-neutral-50 shadow-md"
           >
@@ -94,8 +104,48 @@ export const GroupMapPage = observer(() => {
         </div>
       )}
 
+      {/* 트래킹 시작 버튼 */}
+      {!trackingStore.isTracking && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
+          <button
+            onClick={() => trackingStore.start()}
+            onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); trackingStore.start(); }}
+            className="bg-black text-white px-8 py-3 rounded-full text-sm font-semibold shadow-lg"
+          >
+            ● 시작
+          </button>
+        </div>
+      )}
+
+      {/* 트래킹 중 통계 패널 */}
+      {trackingStore.isTracking && (
+        <div className="absolute bottom-6 left-4 right-4 z-10 bg-white/90 rounded-2xl shadow-lg px-4 py-3">
+          <div className="flex justify-around text-center mb-2">
+            <div>
+              <p className="text-base font-semibold tabular-nums">{trackingStore.formattedTime}</p>
+              <p className="text-xs text-neutral-500">시간</p>
+            </div>
+            <div>
+              <p className="text-base font-semibold tabular-nums">{trackingStore.formattedDistance}</p>
+              <p className="text-xs text-neutral-500">거리</p>
+            </div>
+            <div>
+              <p className="text-base font-semibold tabular-nums">{trackingStore.formattedSpeed}</p>
+              <p className="text-xs text-neutral-500">속도</p>
+            </div>
+          </div>
+          <button
+            onClick={() => trackingStore.stop()}
+            onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); trackingStore.stop(); }}
+            className="w-full bg-red-500 text-white py-2 rounded-xl text-sm font-semibold"
+          >
+            ■ 중지
+          </button>
+        </div>
+      )}
+
       {/* 뒤로가기 버튼 */}
-      <div className="absolute top-4 left-4">
+      <div className="absolute top-4 left-4 z-10">
         <button
           onClick={() => navigate('/group')}
           className="bg-white/90 text-black px-3 py-1 rounded-full text-sm font-medium shadow"
@@ -106,7 +156,7 @@ export const GroupMapPage = observer(() => {
 
       {/* 설정 버튼 (소유자 전용) */}
       {store.currentUserId && store.group && store.currentUserId === store.group.created_by && (
-        <div className="absolute top-4 right-4">
+        <div className="absolute top-4 right-4 z-10">
           <a
             href={`/group/${id}/settings`}
             aria-label="설정"
