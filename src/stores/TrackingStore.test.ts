@@ -30,6 +30,10 @@ describe('TrackingStore', () => {
     it('speedKmh가 0', () => {
       expect(store.speedKmh).toBe(0);
     });
+
+    it('points가 빈 배열', () => {
+      expect(store.points).toEqual([]);
+    });
   });
 
   describe('start()', () => {
@@ -51,6 +55,7 @@ describe('TrackingStore', () => {
       expect(store.elapsedSeconds).toBe(0);
       expect(store.distanceMeters).toBe(0);
       expect(store.speedKmh).toBe(0);
+      expect(store.points).toEqual([]);
     });
   });
 

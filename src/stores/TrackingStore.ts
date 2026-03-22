@@ -15,13 +15,11 @@ class TrackingStore {
 
   public start(): void {
     this._clearTimer();
-    runInAction(() => {
-      this.isTracking = true;
-      this.elapsedSeconds = 0;
-      this.distanceMeters = 0;
-      this.speedKmh = 0;
-      this.points = [];
-    });
+    this.isTracking = true;
+    this.elapsedSeconds = 0;
+    this.distanceMeters = 0;
+    this.speedKmh = 0;
+    this.points = [];
     this.timerId = setInterval(() => {
       runInAction(() => { this.elapsedSeconds += 1; });
     }, 1000);
@@ -29,7 +27,7 @@ class TrackingStore {
 
   public stop(): void {
     this._clearTimer();
-    runInAction(() => { this.isTracking = false; });
+    this.isTracking = false;
   }
 
   public dispose(): void {
