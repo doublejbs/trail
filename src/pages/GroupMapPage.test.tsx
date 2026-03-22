@@ -322,26 +322,29 @@ describe('GroupMapPage', () => {
 
   describe('칩 탭', () => {
     it('초기에 지도 탭이 활성 — map-container 표시', async () => {
+      mockMapStore.map = {} as naver.maps.Map;
       renderAt('/group/group-uuid-1');
       await waitFor(() => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument();
       });
-      expect(screen.getByRole('button', { name: /지도/ })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /순위/ })).toBeInTheDocument();
     });
 
     it('순위 탭 클릭 시 순위 패널 표시', async () => {
+      mockMapStore.map = {} as naver.maps.Map;
       renderAt('/group/group-uuid-1');
       await waitFor(() => screen.getByRole('button', { name: /순위/ }));
       fireEvent.click(screen.getByRole('button', { name: /순위/ }));
       expect(screen.getByTestId('leaderboard-panel')).toBeInTheDocument();
     });
 
-    it('지도 탭 클릭 시 지도 컨테이너 표시', async () => {
+    it('순위 버튼 재클릭 시 순위 패널 닫힘', async () => {
+      mockMapStore.map = {} as naver.maps.Map;
       renderAt('/group/group-uuid-1');
       await waitFor(() => screen.getByRole('button', { name: /순위/ }));
       fireEvent.click(screen.getByRole('button', { name: /순위/ }));
-      fireEvent.click(screen.getByRole('button', { name: /지도/ }));
+      fireEvent.click(screen.getByRole('button', { name: /순위/ }));
+      expect(screen.queryByTestId('leaderboard-panel')).not.toBeInTheDocument();
       expect(screen.getByTestId('map-container')).toBeInTheDocument();
     });
   });
@@ -381,18 +384,14 @@ describe('GroupMapPage', () => {
     it('"활동 종료" 클릭 시 endPeriod() 호출', async () => {
       mockGroupMapStore.isPeriodActive = true;
       renderAt('/group/group-uuid-1');
-      await waitFor(() => screen.getByRole('button', { name: /순위/ }));
-      fireEvent.click(screen.getByRole('button', { name: /순위/ }));
       await waitFor(() => screen.getByRole('button', { name: /활동 종료/ }));
       fireEvent.click(screen.getByRole('button', { name: /활동 종료/ }));
       expect(mockGroupMapStore.endPeriod).toHaveBeenCalledOnce();
     });
 
-    it('순위 탭 + 기간 활성 + 관리자 — "활동 종료" 버튼 표시', async () => {
+    it('기간 활성 + 관리자 — "활동 종료" 버튼 지도 탭에 표시', async () => {
       mockGroupMapStore.isPeriodActive = true;
       renderAt('/group/group-uuid-1');
-      await waitFor(() => screen.getByRole('button', { name: /순위/ }));
-      fireEvent.click(screen.getByRole('button', { name: /순위/ }));
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /활동 종료/ })).toBeInTheDocument();
       });
