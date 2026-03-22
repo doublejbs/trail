@@ -350,6 +350,25 @@ describe('MapStore', () => {
       expect((mockNaverMaps.Marker as ReturnType<typeof vi.fn>).mock.calls.length).toBe(markerCallsBefore);
       expect(mockLocationMarker.setPosition).toHaveBeenCalledWith({ lat: 37.2, lng: 127.2 });
     });
+
+    it('onLocationUpdate 콜백이 올바른 좌표로 호출됨', () => {
+      const callback = vi.fn();
+      watchSpy.mockImplementation((cb: (pos: GeolocationPosition) => void) => {
+        cb({ coords: { latitude: 37.1, longitude: 127.1 } } as GeolocationPosition);
+        return 42;
+      });
+      store.startWatchingLocation(callback);
+      expect(callback).toHaveBeenCalledWith(37.1, 127.1);
+    });
+
+    it('콜백 없이 호출해도 기존 동작 유지', () => {
+      watchSpy.mockImplementation((cb: (pos: GeolocationPosition) => void) => {
+        cb({ coords: { latitude: 37.1, longitude: 127.1 } } as GeolocationPosition);
+        return 42;
+      });
+      expect(() => store.startWatchingLocation()).not.toThrow();
+      expect(store.locationMarker).not.toBeNull();
+    });
   });
 
   describe('stopWatchingLocation()', () => {

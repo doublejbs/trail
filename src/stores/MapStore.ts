@@ -16,6 +16,7 @@ class MapStore {
   private idleListener: naver.maps.MapEventListener | null = null;
 
   private watchId: number | null = null;
+  private lastPosition: { latitude: number; longitude: number } | null = null;
 
   public constructor() {
     makeAutoObservable(this, {
@@ -188,13 +189,19 @@ class MapStore {
   }
 
   public locate(): void {
-    if (!this.map || !navigator.geolocation) {
-      return;
+    if (!this.map) return;
+    if (this.lastPosition) {
+      const { latitude, longitude } = this.lastPosition;
+      this.map.setCenter(new window.naver.maps.LatLng(latitude, longitude));
+    } else if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          this.map!.setCenter(new window.naver.maps.LatLng(latitude, longitude));
+        },
+        (err) => { console.error('[locate] error', err.code, err.message); },
+      );
     }
-    navigator.geolocation.getCurrentPosition((pos) => {
-      const { latitude, longitude } = pos.coords;
-      this.map!.setCenter(new window.naver.maps.LatLng(latitude, longitude));
-    });
   }
 
   public stopWatchingLocation(): void {
@@ -206,12 +213,13 @@ class MapStore {
     this.locationMarker = null;
   }
 
-  public startWatchingLocation(): void {
+  public startWatchingLocation(onLocationUpdate?: (lat: number, lng: number) => void): void {
     if (!this.map) return;
     if (!navigator.geolocation) return;
 
     this.watchId = navigator.geolocation.watchPosition(
       (pos) => {
+        this.lastPosition = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
         if (!this.map) return;
         const { latitude, longitude } = pos.coords;
         const latLng = new window.naver.maps.LatLng(latitude, longitude);
@@ -230,6 +238,8 @@ class MapStore {
             this.locationMarker.setPosition(latLng);
           }
         });
+
+        onLocationUpdate?.(latitude, longitude);
       },
       () => { /* 에러 무시 */ },
     );
