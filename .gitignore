@@ -30,3 +30,4 @@ dist-ssr
 # Capacitor
 ios/App/App/public
 android/app/src/main/assets/public
+.worktrees/
