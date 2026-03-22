@@ -9,6 +9,7 @@ const FAKE_GROUP: Group = {
   name: '한라산 팀',
   created_by: 'user-1',
   gpx_path: 'user-1/group-uuid-1.gpx',
+  gpx_bucket: 'gpx-files',
   created_at: '2026-01-01T00:00:00Z',
   max_members: null,
 };

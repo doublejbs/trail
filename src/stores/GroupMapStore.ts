@@ -34,7 +34,7 @@ class GroupMapStore {
 
       const [{ data: userData }, { data: urlData, error: urlError }] = await Promise.all([
         supabase.auth.getUser(),
-        supabase.storage.from('gpx-files').createSignedUrl((data as Group).gpx_path, 3600),
+        supabase.storage.from((data as Group).gpx_bucket ?? 'gpx-files').createSignedUrl((data as Group).gpx_path, 3600),
       ]);
 
       if (cancelled) return;

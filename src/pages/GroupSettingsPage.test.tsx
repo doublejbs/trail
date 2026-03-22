@@ -11,6 +11,7 @@ const FAKE_GROUP: Group = {
   name: '테스트 그룹',
   created_by: OWNER_ID,
   gpx_path: 'path/to/file.gpx',
+  gpx_bucket: 'gpx-files',
   created_at: '',
   max_members: null,
 };

@@ -3,6 +3,7 @@ export interface Group {
   name: string;
   created_by: string;
   gpx_path: string;
+  gpx_bucket: string;
   created_at: string;
   max_members: number | null;
 }

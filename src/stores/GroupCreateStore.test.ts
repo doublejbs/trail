@@ -133,6 +133,7 @@ describe('GroupCreateStore', () => {
         name: '테스트 그룹',
         created_by: FAKE_USER_ID,
         gpx_path: `${FAKE_USER_ID}/${FAKE_GROUP_ID}.gpx`,
+        gpx_bucket: 'gpx-files',
       });
     });
 

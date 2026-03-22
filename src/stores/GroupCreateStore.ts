@@ -87,6 +87,7 @@ class GroupCreateStore {
     const groupId = crypto.randomUUID();
 
     let gpxPath: string;
+    let gpxBucket: string;
 
     if (this.sourceMode === 'course') {
       const course = this.courses.find((c) => c.id === this.selectedCourseId);
@@ -99,6 +100,7 @@ class GroupCreateStore {
         return;
       }
       gpxPath = course.gpx_path;
+      gpxBucket = 'course-gpx';
     } else {
       const path = `${userId}/${groupId}.gpx`;
       const { error: uploadError } = await supabase.storage
@@ -113,11 +115,12 @@ class GroupCreateStore {
         return;
       }
       gpxPath = path;
+      gpxBucket = 'gpx-files';
     }
 
     const { error: insertError } = await supabase
       .from('groups')
-      .insert({ id: groupId, name: this.name, created_by: userId, gpx_path: gpxPath });
+      .insert({ id: groupId, name: this.name, created_by: userId, gpx_path: gpxPath, gpx_bucket: gpxBucket });
 
     if (insertError) {
       runInAction(() => {
