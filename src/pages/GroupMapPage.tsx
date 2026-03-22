@@ -57,7 +57,7 @@ export const GroupMapPage = observer(() => {
 
   // Effect 4: LeaderboardStore 로드
   useEffect(() => {
-    if (store.group !== undefined && store.gpxText !== undefined) {
+    if (store.group != null && store.gpxText != null) {
       void leaderboardStore.load(store.periodStartedAt ?? null);
     }
   }, [leaderboardStore, store.group, store.gpxText, store.periodStartedAt]);

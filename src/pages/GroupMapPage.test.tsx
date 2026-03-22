@@ -367,6 +367,16 @@ describe('GroupMapPage', () => {
       expect(screen.queryByRole('button', { name: /활동 시작/ })).not.toBeInTheDocument();
     });
 
+    it('"활동 종료" 클릭 시 endPeriod() 호출', async () => {
+      mockGroupMapStore.isPeriodActive = true;
+      renderAt('/group/group-uuid-1');
+      await waitFor(() => screen.getByRole('button', { name: /순위/ }));
+      fireEvent.click(screen.getByRole('button', { name: /순위/ }));
+      await waitFor(() => screen.getByRole('button', { name: /활동 종료/ }));
+      fireEvent.click(screen.getByRole('button', { name: /활동 종료/ }));
+      expect(mockGroupMapStore.endPeriod).toHaveBeenCalledOnce();
+    });
+
     it('순위 탭 + 기간 활성 + 관리자 — "활동 종료" 버튼 표시', async () => {
       mockGroupMapStore.isPeriodActive = true;
       renderAt('/group/group-uuid-1');
