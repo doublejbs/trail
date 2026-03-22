@@ -26,3 +26,7 @@ dist-ssr
 *.sln
 *.sw?
 .superpowers/
+
+# Capacitor
+ios/App/App/public
+android/app/src/main/assets/public
