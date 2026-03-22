@@ -5,6 +5,7 @@ import { observer } from 'mobx-react-lite';
 import { Plus } from 'lucide-react';
 import { CourseStore } from '../stores/CourseStore';
 import { CourseCard } from '../components/CourseCard';
+import { LargeTitle } from '../components/LargeTitle';
 
 const FILTERS = [
   { key: 'all' as const, label: '전체' },
@@ -26,10 +27,7 @@ export const CoursePage = observer(() => {
 
   return (
     <div className="relative flex flex-col h-full bg-white">
-      {/* Header */}
-      <div className="flex items-center px-4 py-3 border-b border-neutral-100">
-        <h1 className="text-base font-semibold">코스</h1>
-      </div>
+      <LargeTitle title="코스" />
 
       {/* Filter chips */}
       <div className="flex gap-2 px-4 py-3">

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
 import { HistoryStore } from '../stores/HistoryStore';
 import type { HistorySession } from '../stores/HistoryStore';
+import { LargeTitle } from '../components/LargeTitle';
 
 function formatTime(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -66,9 +67,7 @@ export const HistoryPage = observer(() => {
 
   return (
     <div className="flex flex-col h-full bg-white">
-      <div className="flex items-center px-4 py-3 border-b border-neutral-100">
-        <h1 className="text-base font-semibold">기록</h1>
-      </div>
+      <LargeTitle title="기록" />
 
       <div className="flex-1 overflow-y-auto">
         {store.loading && (

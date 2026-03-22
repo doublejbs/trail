@@ -5,6 +5,7 @@ import { Plus } from 'lucide-react';
 import { GroupStore } from '../stores/GroupStore';
 import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
+import { LargeTitle } from '../components/LargeTitle';
 
 export const GroupPage = observer(() => {
   const navigate = useNavigate();
@@ -46,6 +47,7 @@ export const GroupPage = observer(() => {
     <div className="h-full flex flex-col bg-white">
       {/* Group list */}
       <div className="flex-1 overflow-y-auto pb-2">
+        <LargeTitle title="그룹" />
         {visibleGroups.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <p className="text-sm text-neutral-400">{emptyMessage}</p>

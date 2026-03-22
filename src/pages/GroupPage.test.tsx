@@ -89,6 +89,11 @@ describe('GroupPage', () => {
     });
   });
 
+  it('그룹 Large Title이 h1으로 렌더링된다', () => {
+    renderGroupPage();
+    expect(screen.getByRole('heading', { name: '그룹', level: 1 })).toBeInTheDocument();
+  });
+
   it('currentUserId가 null이면 "참여중인 그룹"에 모든 그룹이 표시됨', async () => {
     mockStore.currentUserId = null;
     mockStore.groups = [
