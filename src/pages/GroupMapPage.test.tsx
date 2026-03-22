@@ -198,7 +198,7 @@ describe('GroupMapPage', () => {
     it('소유자에게 설정 링크 표시 (created_by 일치)', async () => {
       renderAt('/group/group-uuid-1');
       await waitFor(() => {
-        expect(screen.getByRole('link', { name: /설정/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /설정/i })).toBeInTheDocument();
       });
     });
 
@@ -208,7 +208,7 @@ describe('GroupMapPage', () => {
       await waitFor(() => {
         expect(screen.getByTestId('map-container')).toBeInTheDocument();
       });
-      expect(screen.queryByRole('link', { name: /설정/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /설정/i })).not.toBeInTheDocument();
     });
   });
 
