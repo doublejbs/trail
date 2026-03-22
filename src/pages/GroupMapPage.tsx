@@ -318,13 +318,13 @@ export const GroupMapPage = observer(() => {
         overlay
         rightAction={
           store.currentUserId && store.group && store.currentUserId === store.group.created_by ? (
-            <a
-              href={`/group/${id}/settings`}
+            <button
+              onClick={() => navigate(`/group/${id}/settings`)}
               aria-label="설정"
               className="text-hig-headline min-h-0 min-w-0"
             >
               ⚙
-            </a>
+            </button>
           ) : undefined
         }
       />
