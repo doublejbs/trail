@@ -23,8 +23,10 @@ class TrackingStore {
   public saveError: string | null = null;
 
   private timerId: ReturnType<typeof setInterval> | null = null;
+  private groupId: string;
 
-  public constructor(private groupId: string) {
+  constructor(groupId: string) {
+    this.groupId = groupId;
     makeAutoObservable(this);
   }
 

@@ -14,6 +14,8 @@ const FAKE_GROUP: Group = {
   gpx_bucket: 'gpx-files',
   created_at: '',
   max_members: null,
+  period_started_at: null,
+  period_ended_at: null,
 };
 
 const { mockStore } = vi.hoisted(() => ({

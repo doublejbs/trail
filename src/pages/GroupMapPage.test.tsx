@@ -12,6 +12,8 @@ const FAKE_GROUP: Group = {
   gpx_bucket: 'gpx-files',
   created_at: '2026-01-01T00:00:00Z',
   max_members: null,
+  period_started_at: null,
+  period_ended_at: null,
 };
 
 const FAKE_GPX = `<?xml version="1.0"?><gpx><trk><trkseg><trkpt lat="37.5" lon="126.9"></trkpt></trkseg></trk></gpx>`;

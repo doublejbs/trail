@@ -6,4 +6,6 @@ export interface Group {
   gpx_bucket: string;
   created_at: string;
   max_members: number | null;
+  period_started_at: string | null;
+  period_ended_at: string | null;
 }
