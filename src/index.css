@@ -110,6 +110,14 @@
   --hig-text-caption-weight: 400;
   --hig-text-caption-tracking: 0;
   --hig-text-caption-leading: 1.35;
+
+  /* ── HIG Color tokens ── */
+  --label: rgba(0, 0, 0, 1);
+  --label-secondary: rgba(0, 0, 0, 0.6);
+  --label-tertiary: rgba(0, 0, 0, 0.3);
+  --fill: rgba(0, 0, 0, 0.12);
+  --fill-secondary: rgba(0, 0, 0, 0.06);
+  --separator: rgba(0, 0, 0, 0.15);
 }
 
 .dark {
@@ -186,6 +194,14 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* ── HIG Color utilities ── */
+  --color-label: var(--label);
+  --color-label-secondary: var(--label-secondary);
+  --color-label-tertiary: var(--label-tertiary);
+  --color-fill: var(--fill);
+  --color-fill-secondary: var(--fill-secondary);
+  --color-separator: var(--separator);
 }
 
 @layer base {
