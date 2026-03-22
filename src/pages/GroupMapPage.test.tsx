@@ -41,6 +41,11 @@ const { mockGroupMapStore } = vi.hoisted(() => ({
     gpxText: undefined as string | null | undefined,
     currentUserId: null as string | null,
     load: vi.fn(() => () => {}),
+    isPeriodActive: false,
+    periodStartedAt: null as Date | null,
+    periodEndedAt: null as Date | null,
+    startPeriod: vi.fn(),
+    endPeriod: vi.fn(),
   },
 }));
 
@@ -67,11 +72,27 @@ const { mockTrackingStore } = vi.hoisted(() => ({
     stop: vi.fn(),
     addPoint: vi.fn(),
     dispose: vi.fn(),
+    maxRouteMeters: 0,
+    setRoutePoints: vi.fn(),
   },
 }));
 
 vi.mock('../stores/TrackingStore', () => ({
   TrackingStore: vi.fn(function () { return mockTrackingStore; }),
+}));
+
+const { mockLeaderboardStore } = vi.hoisted(() => ({
+  mockLeaderboardStore: {
+    rankings: [] as { userId: string; displayName: string; maxRouteMeters: number; isLive: boolean }[],
+    loading: false,
+    error: null as string | null,
+    load: vi.fn(),
+    dispose: vi.fn(),
+  },
+}));
+
+vi.mock('../stores/LeaderboardStore', () => ({
+  LeaderboardStore: vi.fn(function () { return mockLeaderboardStore; }),
 }));
 
 vi.mock('react-router-dom', async (importOriginal) => {
@@ -107,6 +128,12 @@ describe('GroupMapPage', () => {
     mockTrackingStore.formattedTime = '00:00:00';
     mockTrackingStore.formattedDistance = '0m';
     mockTrackingStore.formattedSpeed = '0.0km/h';
+    mockTrackingStore.maxRouteMeters = 0;
+    mockGroupMapStore.isPeriodActive = false;
+    mockGroupMapStore.periodStartedAt = null;
+    mockLeaderboardStore.rankings = [];
+    mockLeaderboardStore.loading = false;
+    mockLeaderboardStore.load.mockResolvedValue(undefined);
   });
 
   it('그룹을 찾지 못하면 /group으로 리다이렉트', async () => {
@@ -181,14 +208,14 @@ describe('GroupMapPage', () => {
     it('트래킹 전 — 시작 버튼 표시', async () => {
       renderAt('/group/group-uuid-1');
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /시작/ })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /● 시작/ })).toBeInTheDocument();
       });
     });
 
     it('시작 버튼 클릭 시 trackingStore.start() 호출', async () => {
       renderAt('/group/group-uuid-1');
-      await waitFor(() => screen.getByRole('button', { name: /시작/ }));
-      fireEvent.click(screen.getByRole('button', { name: /시작/ }));
+      await waitFor(() => screen.getByRole('button', { name: /● 시작/ }));
+      fireEvent.click(screen.getByRole('button', { name: /● 시작/ }));
       expect(mockTrackingStore.start).toHaveBeenCalledOnce();
     });
 
@@ -279,6 +306,75 @@ describe('GroupMapPage', () => {
       });
       fireEvent.click(screen.getByRole('button', { name: /코스로 돌아가기/ }));
       expect(mockMapStore.returnToCourse).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('칩 탭', () => {
+    it('초기에 지도 탭이 활성 — map-container 표시', async () => {
+      renderAt('/group/group-uuid-1');
+      await waitFor(() => {
+        expect(screen.getByTestId('map-container')).toBeInTheDocument();
+      });
+      expect(screen.getByRole('button', { name: /지도/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /순위/ })).toBeInTheDocument();
+    });
+
+    it('순위 탭 클릭 시 순위 패널 표시', async () => {
+      renderAt('/group/group-uuid-1');
+      await waitFor(() => screen.getByRole('button', { name: /순위/ }));
+      fireEvent.click(screen.getByRole('button', { name: /순위/ }));
+      expect(screen.getByTestId('leaderboard-panel')).toBeInTheDocument();
+    });
+
+    it('지도 탭 클릭 시 지도 컨테이너 표시', async () => {
+      renderAt('/group/group-uuid-1');
+      await waitFor(() => screen.getByRole('button', { name: /순위/ }));
+      fireEvent.click(screen.getByRole('button', { name: /순위/ }));
+      fireEvent.click(screen.getByRole('button', { name: /지도/ }));
+      expect(screen.getByTestId('map-container')).toBeInTheDocument();
+    });
+  });
+
+  describe('관리자 기간 버튼', () => {
+    it('관리자 + 기간 비활성 — "활동 시작" 버튼 표시', async () => {
+      mockGroupMapStore.isPeriodActive = false;
+      renderAt('/group/group-uuid-1');
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /활동 시작/ })).toBeInTheDocument();
+      });
+    });
+
+    it('관리자 + 기간 활성 — "활동 시작" 버튼 미표시', async () => {
+      mockGroupMapStore.isPeriodActive = true;
+      renderAt('/group/group-uuid-1');
+      await waitFor(() => screen.getByTestId('map-container'));
+      expect(screen.queryByRole('button', { name: /활동 시작/ })).not.toBeInTheDocument();
+    });
+
+    it('"활동 시작" 클릭 시 startPeriod() 호출', async () => {
+      mockGroupMapStore.isPeriodActive = false;
+      renderAt('/group/group-uuid-1');
+      await waitFor(() => screen.getByRole('button', { name: /활동 시작/ }));
+      fireEvent.click(screen.getByRole('button', { name: /활동 시작/ }));
+      expect(mockGroupMapStore.startPeriod).toHaveBeenCalledOnce();
+    });
+
+    it('멤버에게 "활동 시작" 버튼 미표시', async () => {
+      mockGroupMapStore.currentUserId = 'other-user';
+      mockGroupMapStore.isPeriodActive = false;
+      renderAt('/group/group-uuid-1');
+      await waitFor(() => screen.getByTestId('map-container'));
+      expect(screen.queryByRole('button', { name: /활동 시작/ })).not.toBeInTheDocument();
+    });
+
+    it('순위 탭 + 기간 활성 + 관리자 — "활동 종료" 버튼 표시', async () => {
+      mockGroupMapStore.isPeriodActive = true;
+      renderAt('/group/group-uuid-1');
+      await waitFor(() => screen.getByRole('button', { name: /순위/ }));
+      fireEvent.click(screen.getByRole('button', { name: /순위/ }));
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /활동 종료/ })).toBeInTheDocument();
+      });
     });
   });
 });
