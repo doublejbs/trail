@@ -2,15 +2,36 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { runInAction } from 'mobx';
 import { TrackingStore } from './TrackingStore';
 
-const { mockGetUser, mockInsert } = vi.hoisted(() => ({
+const {
+  mockGetUser, mockInsert, mockProfileSelect,
+  mockChannelSubscribe, mockChannelSend, mockRemoveChannel,
+} = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockInsert: vi.fn(),
+  mockProfileSelect: vi.fn(),
+  mockChannelSubscribe: vi.fn(),
+  mockChannelSend: vi.fn(),
+  mockRemoveChannel: vi.fn(),
 }));
+
+const mockChannel = {
+  subscribe: () => mockChannelSubscribe(),
+  send: (...args: unknown[]) => mockChannelSend(...args),
+};
 
 vi.mock('../lib/supabase', () => ({
   supabase: {
     auth: { getUser: () => mockGetUser() },
-    from: () => ({ insert: (...args: unknown[]) => mockInsert(...args) }),
+    from: (table: string) => {
+      if (table === 'profiles') {
+        return {
+          select: () => ({ eq: () => ({ single: () => mockProfileSelect() }) }),
+        };
+      }
+      return { insert: (...args: unknown[]) => mockInsert(...args) };
+    },
+    channel: () => mockChannel,
+    removeChannel: (...args: unknown[]) => mockRemoveChannel(...args),
   },
 }));
 
@@ -24,7 +45,7 @@ describe('TrackingStore', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
-    store = new TrackingStore('test-group-id');
+    store = new TrackingStore('test-group-id', []);
   });
 
   afterEach(() => {
@@ -51,6 +72,10 @@ describe('TrackingStore', () => {
 
     it('points가 빈 배열', () => {
       expect(store.points).toEqual([]);
+    });
+
+    it('maxRouteMeters가 0', () => {
+      expect(store.maxRouteMeters).toBe(0);
     });
   });
 
@@ -187,8 +212,11 @@ describe('TrackingStore', () => {
 
   describe('저장 기능', () => {
     beforeEach(() => {
-      mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } }, error: null });
+      mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1', email: 'user-1@test.com' } }, error: null });
       mockInsert.mockResolvedValue({ error: null });
+      mockProfileSelect.mockResolvedValue({ data: null });
+      mockChannelSubscribe.mockReturnValue(undefined);
+      mockChannelSend.mockResolvedValue({});
     });
 
     it('stop() 후 elapsedSeconds > 0이면 Supabase INSERT 호출', async () => {
@@ -205,6 +233,18 @@ describe('TrackingStore', () => {
       );
     });
 
+    it('INSERT에 max_route_meters 포함', async () => {
+      store.setRoutePoints([{ lat: 37.5, lng: 126.9 }, { lat: 37.51, lng: 126.9 }]);
+      store.start();
+      store.addPoint(37.505, 126.9);
+      vi.advanceTimersByTime(1000);
+      store.stop();
+      await vi.runAllTimersAsync();
+      expect(mockInsert).toHaveBeenCalledWith(
+        expect.objectContaining({ max_route_meters: expect.any(Number) })
+      );
+    });
+
     it('stop() 후 elapsedSeconds === 0이면 INSERT 미호출', async () => {
       store.start();
       store.stop();
@@ -213,11 +253,11 @@ describe('TrackingStore', () => {
     });
 
     it('저장 중 saving === true', async () => {
-      mockInsert.mockImplementation(() => new Promise(() => {})); // 영원히 pending
+      mockInsert.mockImplementation(() => new Promise(() => {}));
       store.start();
       vi.advanceTimersByTime(1000);
       store.stop();
-      await Promise.resolve(); // microtask flush
+      await Promise.resolve();
       expect(store.saving).toBe(true);
     });
 
@@ -245,6 +285,59 @@ describe('TrackingStore', () => {
       store.stop();
       await vi.runAllTimersAsync();
       expect(store.saveError).toBe('저장 실패');
+    });
+  });
+
+  describe('routePoints / maxRouteMeters', () => {
+    it('setRoutePoints() 후 addPoint()하면 maxRouteMeters 업데이트', () => {
+      store.setRoutePoints([{ lat: 37.5, lng: 126.9 }, { lat: 37.51, lng: 126.9 }]);
+      store.start();
+      store.addPoint(37.505, 126.9);
+      expect(store.maxRouteMeters).toBeGreaterThan(0);
+    });
+
+    it('routePoints 빈 배열이면 maxRouteMeters 0 유지', () => {
+      store.start();
+      store.addPoint(37.5, 126.9);
+      store.addPoint(37.501, 126.9);
+      expect(store.maxRouteMeters).toBe(0);
+    });
+  });
+
+  describe('broadcast', () => {
+    beforeEach(() => {
+      mockGetUser.mockResolvedValue({ data: { user: { id: 'u1', email: 'u1@test.com' } }, error: null });
+      mockProfileSelect.mockResolvedValue({ data: { display_name: '홍길동' } });
+      mockChannelSubscribe.mockReturnValue(undefined);
+      mockChannelSend.mockResolvedValue({});
+    });
+
+    it('start() 후 _initBroadcast가 채널 구독', async () => {
+      store.start();
+      await vi.runAllTimersAsync();
+      expect(mockChannelSubscribe).toHaveBeenCalled();
+    });
+
+    it('1초 후 채널로 broadcast 전송', async () => {
+      store.start();
+      await vi.runAllTimersAsync();
+      vi.advanceTimersByTime(1000);
+      expect(mockChannelSend).toHaveBeenCalled();
+    });
+
+    it('dispose() 시 채널 제거', async () => {
+      store.start();
+      await vi.runAllTimersAsync();
+      store.dispose();
+      expect(mockRemoveChannel).toHaveBeenCalled();
+    });
+
+    it('미인증 시 broadcast 미전송', async () => {
+      mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
+      store.start();
+      await vi.runAllTimersAsync();
+      vi.advanceTimersByTime(1000);
+      expect(mockChannelSend).not.toHaveBeenCalled();
     });
   });
 });
