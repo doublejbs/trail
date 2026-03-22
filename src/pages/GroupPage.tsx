@@ -40,33 +40,10 @@ export const GroupPage = observer(() => {
       ? '아직 만든 그룹이 없습니다'
       : '아직 참여한 그룹이 없습니다';
 
-  const tabClass = (tab: 'owned' | 'joined') =>
-    `flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
-      store.activeTab === tab
-        ? 'border-black text-black'
-        : 'border-transparent text-neutral-400'
-    }`;
-
   return (
-    <div className="relative h-full flex flex-col bg-white">
-      {/* Tab bar */}
-      <div className="flex border-b border-neutral-200 shrink-0">
-        <button
-          className={tabClass('owned')}
-          onClick={() => store.setActiveTab('owned')}
-        >
-          내가 만든 그룹
-        </button>
-        <button
-          className={tabClass('joined')}
-          onClick={() => store.setActiveTab('joined')}
-        >
-          참여중인 그룹
-        </button>
-      </div>
-
+    <div className="h-full flex flex-col bg-white">
       {/* Group list */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto pb-2">
         {visibleGroups.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <p className="text-sm text-neutral-400">{emptyMessage}</p>
@@ -84,14 +61,40 @@ export const GroupPage = observer(() => {
         )}
       </div>
 
-      {/* FAB */}
-      <button
-        onClick={() => navigate('/group/new')}
-        aria-label="그룹 만들기"
-        className="absolute right-4 bottom-4 w-12 h-12 bg-black text-white rounded-full flex items-center justify-center shadow-lg active:bg-neutral-800"
-      >
-        <Plus size={22} />
-      </button>
+      {/* Bottom control bar */}
+      <div className="flex items-center justify-between px-4 py-2.5 border-t border-neutral-200 bg-white shrink-0">
+        {/* Segmented chip */}
+        <div className="flex-1 flex justify-center">
+          <div className="flex bg-neutral-100 rounded-lg p-0.5">
+            <button
+              onClick={() => store.setActiveTab('owned')}
+              aria-pressed={store.activeTab === 'owned'}
+              className={`py-1.5 px-4 text-sm font-semibold rounded-md transition-colors ${
+                store.activeTab === 'owned' ? 'bg-black text-white' : 'text-neutral-400'
+              }`}
+            >
+              내가 만든
+            </button>
+            <button
+              onClick={() => store.setActiveTab('joined')}
+              aria-pressed={store.activeTab === 'joined'}
+              className={`py-1.5 px-4 text-sm font-semibold rounded-md transition-colors ${
+                store.activeTab === 'joined' ? 'bg-black text-white' : 'text-neutral-400'
+              }`}
+            >
+              참여중
+            </button>
+          </div>
+        </div>
+        {/* FAB */}
+        <button
+          onClick={() => navigate('/group/new')}
+          aria-label="그룹 만들기"
+          className="w-12 h-12 bg-black text-white rounded-full flex items-center justify-center shadow-lg active:bg-neutral-800"
+        >
+          <Plus size={22} />
+        </button>
+      </div>
     </div>
   );
 });

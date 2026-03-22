@@ -45,8 +45,8 @@ describe('GroupPage', () => {
 
   it('기본 탭은 "내가 만든 그룹"', () => {
     renderGroupPage();
-    const ownedTab = screen.getByRole('button', { name: '내가 만든 그룹' });
-    expect(ownedTab).toHaveClass('border-black');
+    const ownedTab = screen.getByRole('button', { name: '내가 만든' });
+    expect(ownedTab).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('"내가 만든 그룹" 탭: created_by === currentUserId 그룹만 표시', async () => {
@@ -67,7 +67,7 @@ describe('GroupPage', () => {
       { id: 'g2', name: '남의 그룹', created_by: 'other-user', gpx_path: '', created_at: '', max_members: null },
     ];
     renderGroupPage();
-    fireEvent.click(screen.getByRole('button', { name: '참여중인 그룹' }));
+    fireEvent.click(screen.getByRole('button', { name: '참여중' }));
     await waitFor(() => {
       expect(screen.queryByText('내 그룹')).not.toBeInTheDocument();
       expect(screen.getByText('남의 그룹')).toBeInTheDocument();
@@ -83,7 +83,7 @@ describe('GroupPage', () => {
 
   it('"참여중인 그룹" 탭 비었을 때 전용 empty 메시지', async () => {
     renderGroupPage();
-    fireEvent.click(screen.getByRole('button', { name: '참여중인 그룹' }));
+    fireEvent.click(screen.getByRole('button', { name: '참여중' }));
     await waitFor(() => {
       expect(screen.getByText('아직 참여한 그룹이 없습니다')).toBeInTheDocument();
     });
@@ -96,7 +96,7 @@ describe('GroupPage', () => {
       { id: 'g2', name: '남의 그룹', created_by: 'other-user', gpx_path: '', created_at: '', max_members: null },
     ];
     renderGroupPage();
-    fireEvent.click(screen.getByRole('button', { name: '참여중인 그룹' }));
+    fireEvent.click(screen.getByRole('button', { name: '참여중' }));
     await waitFor(() => {
       expect(screen.getByText('내 그룹')).toBeInTheDocument();
       expect(screen.getByText('남의 그룹')).toBeInTheDocument();
