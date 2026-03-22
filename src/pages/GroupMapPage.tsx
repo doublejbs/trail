@@ -14,7 +14,7 @@ export const GroupMapPage = observer(() => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapStore] = useState(() => new MapStore());
   const [store] = useState(() => new GroupMapStore(navigate));
-  const [trackingStore] = useState(() => new TrackingStore());
+  const [trackingStore] = useState(() => new TrackingStore(id ?? ''));
 
   // Effect 1: 데이터 fetch
   useEffect(() => {
@@ -58,7 +58,7 @@ export const GroupMapPage = observer(() => {
     );
   }
 
-  const bottomOffset = trackingStore.isTracking ? 'bottom-36' : 'bottom-20';
+  const bottomOffset = (trackingStore.isTracking || trackingStore.saving) ? 'bottom-36' : 'bottom-20';
 
   return (
     <div className="absolute inset-0">
@@ -118,7 +118,7 @@ export const GroupMapPage = observer(() => {
       )}
 
       {/* 트래킹 중 통계 패널 */}
-      {trackingStore.isTracking && (
+      {(trackingStore.isTracking || trackingStore.saving) && (
         <div className="absolute bottom-6 left-4 right-4 z-10 bg-white/90 rounded-2xl shadow-lg px-4 py-3">
           <div className="flex justify-around text-center mb-2">
             <div>
@@ -137,9 +137,14 @@ export const GroupMapPage = observer(() => {
           <button
             onClick={() => trackingStore.stop()}
             onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); trackingStore.stop(); }}
-            className="w-full bg-red-500 text-white py-2 rounded-xl text-sm font-semibold"
+            disabled={trackingStore.saving}
+            className={`w-full py-2 rounded-xl text-sm font-semibold ${
+              trackingStore.saving
+                ? 'bg-neutral-300 text-neutral-500 cursor-not-allowed'
+                : 'bg-red-500 text-white'
+            }`}
           >
-            ■ 중지
+            {trackingStore.saving ? '저장 중...' : '■ 중지'}
           </button>
         </div>
       )}

@@ -59,6 +59,8 @@ const { mockTrackingStore } = vi.hoisted(() => ({
     formattedTime: '00:00:00',
     formattedDistance: '0m',
     formattedSpeed: '0.0km/h',
+    saving: false,
+    saveError: null as string | null,
     start: vi.fn(),
     stop: vi.fn(),
     addPoint: vi.fn(),
@@ -98,6 +100,8 @@ describe('GroupMapPage', () => {
     mockGroupMapStore.currentUserId = 'user-1';
     mockGroupMapStore.load.mockReturnValue(() => {});
     mockTrackingStore.isTracking = false;
+    mockTrackingStore.saving = false;
+    mockTrackingStore.saveError = null;
     mockTrackingStore.formattedTime = '00:00:00';
     mockTrackingStore.formattedDistance = '0m';
     mockTrackingStore.formattedSpeed = '0.0km/h';
@@ -220,6 +224,27 @@ describe('GroupMapPage', () => {
       renderAt('/group/group-uuid-1');
       await waitFor(() => screen.getByRole('button', { name: /중지/ }));
       expect(screen.queryByRole('button', { name: /시작/ })).not.toBeInTheDocument();
+    });
+
+    it('saving 중 통계 패널 유지', async () => {
+      mockTrackingStore.isTracking = false;
+      mockTrackingStore.saving = true;
+      mockTrackingStore.formattedTime = '00:00:05';
+      mockTrackingStore.formattedDistance = '0m';
+      mockTrackingStore.formattedSpeed = '0.0km/h';
+      renderAt('/group/group-uuid-1');
+      await waitFor(() => {
+        expect(screen.getByText('00:00:05')).toBeInTheDocument();
+      });
+    });
+
+    it('saving 중 중지 버튼 disabled', async () => {
+      mockTrackingStore.isTracking = false;
+      mockTrackingStore.saving = true;
+      renderAt('/group/group-uuid-1');
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /저장 중/ })).toBeDisabled();
+      });
     });
   });
 
