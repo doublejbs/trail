@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
 import { Plus } from 'lucide-react';
 import { GroupStore } from '../stores/GroupStore';
+import { Button } from '@/components/ui/button';
+import { ButtonGroup } from '@/components/ui/button-group';
 
 export const GroupPage = observer(() => {
   const navigate = useNavigate();
@@ -65,26 +67,26 @@ export const GroupPage = observer(() => {
       <div className="flex items-center justify-between px-4 py-2.5 border-t border-neutral-200 bg-white shrink-0">
         {/* Segmented chip */}
         <div className="flex-1 flex justify-center">
-          <div className="flex bg-neutral-100 rounded-lg p-0.5">
-            <button
+          <ButtonGroup className="bg-neutral-100 p-0.5">
+            <Button
               onClick={() => store.setActiveTab('owned')}
               aria-pressed={store.activeTab === 'owned'}
-              className={`py-1.5 px-4 text-sm font-semibold rounded-md transition-colors ${
-                store.activeTab === 'owned' ? 'bg-black text-white' : 'text-neutral-400'
-              }`}
+              variant={store.activeTab === 'owned' ? 'default' : 'ghost'}
+              size="sm"
+              className={store.activeTab !== 'owned' ? 'text-neutral-400' : ''}
             >
               내가 만든
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => store.setActiveTab('joined')}
               aria-pressed={store.activeTab === 'joined'}
-              className={`py-1.5 px-4 text-sm font-semibold rounded-md transition-colors ${
-                store.activeTab === 'joined' ? 'bg-black text-white' : 'text-neutral-400'
-              }`}
+              variant={store.activeTab === 'joined' ? 'default' : 'ghost'}
+              size="sm"
+              className={store.activeTab !== 'joined' ? 'text-neutral-400' : ''}
             >
               참여중
-            </button>
-          </div>
+            </Button>
+          </ButtonGroup>
         </div>
         {/* FAB */}
         <button
