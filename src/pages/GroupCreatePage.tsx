@@ -43,20 +43,81 @@ export const GroupCreatePage = observer(() => {
             />
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label className="text-sm text-neutral-500">GPX 파일</label>
-            <label className="bg-neutral-100 rounded-lg px-3 py-2 text-sm border border-neutral-200 cursor-pointer flex items-center">
-              <span className="text-neutral-500">
-                {store.file ? store.file.name : '파일 선택'}
-              </span>
-              <input
-                type="file"
-                accept=".gpx"
-                className="hidden"
-                onChange={(e) => store.setFile(e.target.files?.[0] ?? null)}
-              />
-            </label>
+          {/* 탭 */}
+          <div className="flex rounded-lg border border-neutral-200 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => store.setSourceMode('course')}
+              className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                store.sourceMode === 'course'
+                  ? 'bg-black text-white'
+                  : 'text-neutral-500 bg-white'
+              }`}
+            >
+              코스 선택
+            </button>
+            <button
+              type="button"
+              onClick={() => store.setSourceMode('file')}
+              className={`flex-1 py-2 text-sm font-medium transition-colors ${
+                store.sourceMode === 'file'
+                  ? 'bg-black text-white'
+                  : 'text-neutral-500 bg-white'
+              }`}
+            >
+              GPX 업로드
+            </button>
           </div>
+
+          {/* 탭 콘텐츠 */}
+          {store.sourceMode === 'course' ? (
+            <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
+              {store.coursesLoading ? (
+                <div className="flex justify-center py-6">
+                  <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : store.courses.length === 0 ? (
+                <p className="text-sm text-neutral-400 text-center py-6">등록된 코스가 없습니다</p>
+              ) : (
+                store.courses.map((course) => (
+                  <button
+                    key={course.id}
+                    type="button"
+                    onClick={() => store.setSelectedCourseId(course.id)}
+                    className={`text-left rounded-lg px-3 py-2 border transition-colors ${
+                      store.selectedCourseId === course.id
+                        ? 'border-black bg-neutral-50'
+                        : 'border-neutral-200 bg-white'
+                    }`}
+                  >
+                    <div className="text-sm font-medium">{course.name}</div>
+                    <div className="text-xs text-neutral-400 mt-0.5">
+                      {course.distance_m != null
+                        ? `${(course.distance_m / 1000).toFixed(1)} km`
+                        : '거리 미상'}
+                      {course.elevation_gain_m != null
+                        ? ` · 고도 ${course.elevation_gain_m} m`
+                        : ''}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1">
+              <label className="bg-neutral-100 rounded-lg px-3 py-2 text-sm border border-neutral-200 cursor-pointer flex items-center">
+                <span className="text-neutral-500">
+                  {store.file ? store.file.name : '파일 선택'}
+                </span>
+                <input
+                  type="file"
+                  accept=".gpx"
+                  className="hidden"
+                  onChange={(e) => store.setFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+            </div>
+          )}
         </div>
 
         <div className="mt-auto pt-4">
