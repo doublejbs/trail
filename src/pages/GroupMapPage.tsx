@@ -55,19 +55,37 @@ export const GroupMapPage = observer(() => {
     if (routePoints.length > 0) trackingStore.setRoutePoints(routePoints);
   }, [trackingStore, routePoints]);
 
+  // 그룹/GPX 로드 완료 후 한 번만 실행: restore, leaderboard, period 구독
+  const initialized = useRef(false);
   useEffect(() => {
-    if (store.group != null && store.gpxText != null) {
-      void leaderboardStore.load(store.periodStartedAt ?? null);
-    }
-  }, [leaderboardStore, store.group, store.gpxText, store.periodStartedAt]);
+    if (!id || store.group == null || store.gpxText == null || initialized.current) return;
+    initialized.current = true;
+
+    void trackingStore.restore();
+    void leaderboardStore.load(store.periodStartedAt ?? null);
+
+    const admin = store.currentUserId === store.group?.created_by;
+    const unsubscribe = store.subscribeToPeriodEvents(admin);
+    const disposerEnd = reaction(
+      () => store.periodEndedAt,
+      (endedAt) => {
+        void leaderboardStore.load(store.periodStartedAt);
+        if (endedAt && trackingStore.isTracking) {
+          void trackingStore.stop();
+        }
+      },
+    );
+    const disposerStart = reaction(
+      () => store.periodStartedAt,
+      (startedAt) => { void leaderboardStore.load(startedAt); },
+    );
+
+    return () => { unsubscribe(); disposerEnd(); disposerStart(); };
+  }, [id, store, store.group, store.gpxText, trackingStore, leaderboardStore]);
 
   useEffect(() => {
-    return () => { trackingStore.dispose(); };
-  }, [trackingStore]);
-
-  useEffect(() => {
-    return () => { leaderboardStore.dispose(); };
-  }, [leaderboardStore]);
+    return () => { trackingStore.dispose(); leaderboardStore.dispose(); };
+  }, [trackingStore, leaderboardStore]);
 
   useEffect(() => {
     const disposer = autorun(() => {
@@ -80,20 +98,6 @@ export const GroupMapPage = observer(() => {
     });
     return disposer;
   }, [leaderboardStore, mapStore, store]);
-
-  useEffect(() => {
-    if (!id || store.group == null) return;
-    const unsubscribe = store.subscribeToPeriodEvents();
-    const disposerEnd = reaction(
-      () => store.periodEndedAt,
-      () => { void leaderboardStore.load(store.periodStartedAt); },
-    );
-    const disposerStart = reaction(
-      () => store.periodStartedAt,
-      (startedAt) => { void leaderboardStore.load(startedAt); },
-    );
-    return () => { unsubscribe(); disposerEnd(); disposerStart(); };
-  }, [id, store, leaderboardStore]);
 
   if (store.group === null) return <Navigate to="/group" replace />;
 
@@ -154,10 +158,10 @@ export const GroupMapPage = observer(() => {
 
       {/* Return to course */}
       {mapStore.map && !mapStore.isCourseVisible && (
-        <div className={`absolute ${bottomOffset} left-1/2 -translate-x-1/2 z-10`}>
+        <div className="absolute top-[56px] right-4 z-20">
           <button
             onClick={() => mapStore.returnToCourse()}
-            className="bg-white text-black px-5 py-2.5 rounded-full text-[13px] font-semibold shadow-lg shadow-black/10 whitespace-nowrap border border-black/[0.06]"
+            className="bg-white text-black px-4 py-2 rounded-full text-[12px] font-bold shadow-lg shadow-black/10 whitespace-nowrap border border-black/[0.06]"
           >
             코스로 돌아가기
           </button>
@@ -190,54 +194,66 @@ export const GroupMapPage = observer(() => {
         </div>
       )}
 
-      {/* Tracking start + admin controls */}
-      {!trackingStore.isTracking && !trackingStore.saving && activeTab === 'map' && (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2.5">
-          {isAdmin && !store.isPeriodActive && (
+      {/* Admin period controls — same position as tracking start button */}
+      {isAdmin && (
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">
+          {!store.isPeriodActive ? (
             <button
               onClick={() => void store.startPeriod()}
               onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); void store.startPeriod(); }}
-              className="bg-white text-black px-6 py-2.5 rounded-full text-[13px] font-bold shadow-lg shadow-black/10 border border-black/[0.06]"
+              className="bg-black text-white px-10 py-3.5 rounded-full text-[15px] font-bold shadow-lg shadow-black/25 active:scale-95 transition-transform"
             >
               활동 시작
             </button>
-          )}
-          {isAdmin && store.isPeriodActive && (
+          ) : (
             <button
               onClick={() => void store.endPeriod()}
               onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); void store.endPeriod(); }}
-              className="bg-white text-black/60 px-6 py-2.5 rounded-full text-[13px] font-bold shadow-lg shadow-black/10 border border-black/[0.06]"
+              className="bg-white text-black/60 px-10 py-3.5 rounded-full text-[15px] font-bold shadow-lg shadow-black/10 border border-black/[0.06] active:scale-95 transition-transform"
             >
               활동 종료
             </button>
           )}
-          <button
-            onClick={() => trackingStore.start()}
-            onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); trackingStore.start(); }}
-            className="bg-black text-white px-10 py-3.5 rounded-full text-[15px] font-bold shadow-lg shadow-black/25 active:scale-95 transition-transform"
-          >
-            시작
-          </button>
         </div>
       )}
 
-      {/* Tracking stats panel */}
+      {/* Tracking start button */}
+      {!isAdmin && !trackingStore.isTracking && !trackingStore.saving && !trackingStore.restoring && activeTab === 'map' && (
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2">
+          <button
+            disabled={!store.isPeriodActive}
+            onClick={() => void trackingStore.start()}
+            onTouchEnd={(e) => { if (!store.isPeriodActive) return; e.preventDefault(); e.stopPropagation(); void trackingStore.start(); }}
+            className={`px-10 py-3.5 rounded-full text-[15px] font-bold shadow-lg transition-transform ${
+              store.isPeriodActive
+                ? 'bg-black text-white shadow-black/25 active:scale-95'
+                : 'bg-neutral-300 text-white shadow-black/10 cursor-not-allowed'
+            }`}
+          >
+            시작
+          </button>
+          {!store.isPeriodActive && (
+            <p className="text-[12px] font-medium text-black/70 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm whitespace-nowrap">관리자가 활동을 시작하면 시작할 수 있습니다</p>
+          )}
+        </div>
+      )}
+
+      {/* Tracking panel */}
       {(trackingStore.isTracking || trackingStore.saving) && (
         <div className="absolute bottom-6 left-4 right-4 z-10 bg-white rounded-2xl shadow-xl shadow-black/10 border border-black/[0.06] px-5 py-4">
           <div className="flex justify-around text-center mb-3">
             <div>
-              <p className="text-[18px] font-bold tabular-nums text-black">{trackingStore.formattedTime}</p>
-              <p className="text-[11px] text-black/35 font-medium">시간</p>
+              <p className="text-[20px] font-bold tabular-nums text-black">{trackingStore.formattedTime}</p>
+              <p className="text-[11px] text-black/35 font-medium">경과 시간</p>
             </div>
             <div className="w-px bg-black/[0.06]" />
             <div>
-              <p className="text-[18px] font-bold tabular-nums text-black">{trackingStore.formattedDistance}</p>
-              <p className="text-[11px] text-black/35 font-medium">거리</p>
-            </div>
-            <div className="w-px bg-black/[0.06]" />
-            <div>
-              <p className="text-[18px] font-bold tabular-nums text-black">{trackingStore.formattedSpeed}</p>
-              <p className="text-[11px] text-black/35 font-medium">속도</p>
+              <p className="text-[20px] font-bold tabular-nums text-black">
+                {totalRouteMeters > 0
+                  ? `${Math.max(0, (totalRouteMeters - trackingStore.maxRouteMeters) / 1000).toFixed(1)}km`
+                  : '—'}
+              </p>
+              <p className="text-[11px] text-black/35 font-medium">남은 거리</p>
             </div>
           </div>
           {trackingStore.saving && (
@@ -247,8 +263,8 @@ export const GroupMapPage = observer(() => {
           )}
           {!trackingStore.saving && !trackingStore.isPaused && (
             <button
-              onClick={() => trackingStore.pause()}
-              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); trackingStore.pause(); }}
+              onClick={() => void trackingStore.pause()}
+              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); void trackingStore.pause(); }}
               className="w-full py-3 rounded-xl text-[14px] font-semibold bg-black/[0.08] text-black/60"
             >
               일시정지
@@ -257,15 +273,15 @@ export const GroupMapPage = observer(() => {
           {!trackingStore.saving && trackingStore.isPaused && (
             <div className="flex gap-2">
               <button
-                onClick={() => trackingStore.resume()}
-                onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); trackingStore.resume(); }}
+                onClick={() => void trackingStore.resume()}
+                onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); void trackingStore.resume(); }}
                 className="flex-1 py-3 rounded-xl text-[14px] font-semibold bg-black text-white"
               >
                 재개
               </button>
               <button
-                onClick={() => trackingStore.stop()}
-                onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); trackingStore.stop(); }}
+                onClick={() => void trackingStore.stop()}
+                onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); void trackingStore.stop(); }}
                 className="flex-1 py-3 rounded-xl text-[14px] font-semibold bg-red-500 text-white"
               >
                 종료

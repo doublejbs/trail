@@ -79,7 +79,7 @@ class GroupMapStore {
     return () => { cancelled = true; };
   }
 
-  public subscribeToPeriodEvents(): () => void {
+  public subscribeToPeriodEvents(isAdmin: boolean = false): () => void {
     const channel = supabase.channel(`group-period:${this.groupId}`, {
       config: { broadcast: { self: false } },
     });
@@ -97,12 +97,45 @@ class GroupMapStore {
     });
     channel.subscribe();
     this._periodChannel = channel;
+
+    // 폴링: 관리자가 아닌 경우에만 5초마다 그룹 상태 확인
+    const pollId = isAdmin ? null : setInterval(() => { void this._pollPeriodStatus(); }, 5000);
+
     return () => {
+      if (pollId) clearInterval(pollId);
       if (this._periodChannel) {
         void supabase.removeChannel(this._periodChannel);
         this._periodChannel = null;
       }
     };
+  }
+
+  private async _pollPeriodStatus(): Promise<void> {
+    const { data } = await supabase
+      .from('groups')
+      .select('period_started_at, period_ended_at')
+      .eq('id', this.groupId)
+      .single();
+    if (!data) return;
+
+    const newStarted = data.period_started_at ? new Date(data.period_started_at) : null;
+    const newEnded = data.period_ended_at ? new Date(data.period_ended_at) : null;
+
+    const wasActive = this.isPeriodActive;
+
+    runInAction(() => {
+      this.periodStartedAt = newStarted;
+      this.periodEndedAt = newEnded;
+    });
+
+    // 활동 중 → 종료 전환 감지
+    if (wasActive && newEnded) {
+      toast('활동이 종료되었습니다');
+    }
+    // 비활성 → 활동 시작 전환 감지
+    if (!wasActive && newStarted && !newEnded) {
+      toast('활동이 시작되었습니다');
+    }
   }
 
   public async startPeriod(): Promise<void> {
@@ -135,6 +168,13 @@ class GroupMapStore {
       .update({ period_ended_at: now.toISOString() })
       .eq('id', this.groupId);
     if (!error) {
+      // 해당 그룹의 모든 active/paused 세션을 completed로 변경
+      await supabase
+        .from('tracking_sessions')
+        .update({ status: 'completed' })
+        .eq('group_id', this.groupId)
+        .in('status', ['active', 'paused']);
+
       runInAction(() => { this.periodEndedAt = now; });
       if (this._periodChannel) {
         void this._periodChannel.send({

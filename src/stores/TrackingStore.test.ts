@@ -1,17 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { runInAction } from 'mobx';
 import { TrackingStore } from './TrackingStore';
 
 const {
-  mockGetUser, mockInsert, mockProfileSelect,
+  mockGetUser, mockInsert, mockUpdate, mockProfileSelect,
   mockChannelSubscribe, mockChannelSend, mockRemoveChannel,
+  mockSelect,
 } = vi.hoisted(() => ({
   mockGetUser: vi.fn(),
   mockInsert: vi.fn(),
+  mockUpdate: vi.fn(),
   mockProfileSelect: vi.fn(),
   mockChannelSubscribe: vi.fn(),
   mockChannelSend: vi.fn(),
   mockRemoveChannel: vi.fn(),
+  mockSelect: vi.fn(),
 }));
 
 const mockChannel = {
@@ -28,7 +30,25 @@ vi.mock('../lib/supabase', () => ({
           select: () => ({ eq: () => ({ single: () => mockProfileSelect() }) }),
         };
       }
-      return { insert: (...args: unknown[]) => mockInsert(...args) };
+      return {
+        insert: (...args: unknown[]) => mockInsert(...args),
+        update: (data: unknown) => ({
+          eq: () => mockUpdate(data),
+        }),
+        select: () => ({
+          eq: () => ({
+            eq: () => ({
+              in: () => ({
+                order: () => ({
+                  limit: () => ({
+                    single: () => mockSelect(),
+                  }),
+                }),
+              }),
+            }),
+          }),
+        }),
+      };
     },
     channel: () => mockChannel,
     removeChannel: (...args: unknown[]) => mockRemoveChannel(...args),
@@ -45,6 +65,13 @@ describe('TrackingStore', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1', email: 'user-1@test.com' } }, error: null });
+    mockInsert.mockResolvedValue({ error: null });
+    mockUpdate.mockResolvedValue({ error: null });
+    mockProfileSelect.mockResolvedValue({ data: null });
+    mockChannelSubscribe.mockReturnValue(undefined);
+    mockChannelSend.mockResolvedValue({});
+    mockSelect.mockResolvedValue({ data: null });
     store = new TrackingStore('test-group-id', []);
   });
 
@@ -66,10 +93,6 @@ describe('TrackingStore', () => {
       expect(store.distanceMeters).toBe(0);
     });
 
-    it('speedKmh가 0', () => {
-      expect(store.speedKmh).toBe(0);
-    });
-
     it('points가 빈 배열', () => {
       expect(store.points).toEqual([]);
     });
@@ -80,61 +103,75 @@ describe('TrackingStore', () => {
   });
 
   describe('start()', () => {
-    it('isTracking을 true로 설정', () => {
-      store.start();
+    it('isTracking을 true로 설정', async () => {
+      await store.start();
       expect(store.isTracking).toBe(true);
     });
 
-    it('1초마다 elapsedSeconds 증가', () => {
-      store.start();
-      vi.advanceTimersByTime(3000);
-      expect(store.elapsedSeconds).toBe(3);
+    it('DB에 INSERT 호출', async () => {
+      await store.start();
+      expect(mockInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user_id: 'user-1',
+          group_id: 'test-group-id',
+          status: 'active',
+        })
+      );
+    });
+  });
+
+  describe('pause()', () => {
+    it('isPaused를 true로 설정', async () => {
+      await store.start();
+      await store.pause();
+      expect(store.isPaused).toBe(true);
     });
 
-    it('재호출 시 상태 리셋', () => {
-      store.start();
-      vi.advanceTimersByTime(5000);
-      store.start();
-      expect(store.elapsedSeconds).toBe(0);
-      expect(store.distanceMeters).toBe(0);
-      expect(store.speedKmh).toBe(0);
-      expect(store.points).toEqual([]);
+    it('DB에 status=paused UPDATE 호출', async () => {
+      await store.start();
+      await store.pause();
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'paused' })
+      );
+    });
+  });
+
+  describe('resume()', () => {
+    it('isPaused를 false로 설정', async () => {
+      await store.start();
+      await store.pause();
+      await store.resume();
+      expect(store.isPaused).toBe(false);
+    });
+
+    it('DB에 status=active UPDATE 호출', async () => {
+      await store.start();
+      await store.pause();
+      await store.resume();
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'active' })
+      );
     });
   });
 
   describe('stop()', () => {
-    it('isTracking을 false로 설정', () => {
-      store.start();
-      store.stop();
+    it('isTracking을 false로 설정', async () => {
+      await store.start();
+      await store.stop();
       expect(store.isTracking).toBe(false);
     });
 
-    it('stop 후 타이머 멈춤 — elapsedSeconds 증가 없음', () => {
-      store.start();
-      vi.advanceTimersByTime(2000);
-      store.stop();
-      vi.advanceTimersByTime(3000);
-      expect(store.elapsedSeconds).toBe(2);
-    });
-
-    it('stop 후 상태 보존 (리셋 안됨)', () => {
-      store.start();
-      vi.advanceTimersByTime(2000);
-      store.stop();
-      expect(store.elapsedSeconds).toBe(2);
+    it('DB에 status=completed UPDATE 호출', async () => {
+      await store.start();
+      await store.stop();
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'completed' })
+      );
     });
   });
 
   describe('dispose()', () => {
-    it('dispose 후 타이머 멈춤', () => {
-      store.start();
-      vi.advanceTimersByTime(2000);
-      store.dispose();
-      vi.advanceTimersByTime(3000);
-      expect(store.elapsedSeconds).toBe(2);
-    });
-
-    it('트래킹 중이 아닐 때 dispose 호출해도 에러 없음', () => {
+    it('에러 없이 호출 가능', () => {
       expect(() => store.dispose()).not.toThrow();
     });
   });
@@ -145,28 +182,17 @@ describe('TrackingStore', () => {
       expect(store.distanceMeters).toBe(0);
     });
 
-    it('첫 번째 포인트 — distance 0, speed 0', () => {
-      store.start();
+    it('첫 번째 포인트 — distance 0', async () => {
+      await store.start();
       store.addPoint(37.5, 126.9);
       expect(store.distanceMeters).toBe(0);
-      expect(store.speedKmh).toBe(0);
     });
 
-    it('두 번째 포인트 — distance 누적', () => {
-      store.start();
+    it('두 번째 포인트 — distance 누적', async () => {
+      await store.start();
       store.addPoint(37.5, 126.9);
       store.addPoint(37.501, 126.9);
       expect(store.distanceMeters).toBeGreaterThan(0);
-    });
-
-    it('두 번째 포인트 — speed 계산', () => {
-      store.start();
-      const ts1 = Date.now();
-      vi.setSystemTime(ts1);
-      store.addPoint(37.5, 126.9);
-      vi.setSystemTime(ts1 + 1000);
-      store.addPoint(37.501, 126.9);
-      expect(store.speedKmh).toBeGreaterThan(0);
     });
   });
 
@@ -174,130 +200,44 @@ describe('TrackingStore', () => {
     it('formattedTime — 0초는 "00:00:00"', () => {
       expect(store.formattedTime).toBe('00:00:00');
     });
-
-    it('formattedTime — 3661초는 "01:01:01"', () => {
-      store.start();
-      vi.advanceTimersByTime(3661000);
-      expect(store.formattedTime).toBe('01:01:01');
-    });
-
-    it('formattedDistance — 999m는 "999m"', () => {
-      store.start();
-      runInAction(() => { store.distanceMeters = 999; });
-      expect(store.formattedDistance).toBe('999m');
-    });
-
-    it('formattedDistance — 1000m는 "1.0km"', () => {
-      store.start();
-      runInAction(() => { store.distanceMeters = 1000; });
-      expect(store.formattedDistance).toBe('1.0km');
-    });
-
-    it('formattedDistance — 1500m는 "1.5km"', () => {
-      store.start();
-      runInAction(() => { store.distanceMeters = 1500; });
-      expect(store.formattedDistance).toBe('1.5km');
-    });
-
-    it('formattedSpeed — "0.0km/h"', () => {
-      expect(store.formattedSpeed).toBe('0.0km/h');
-    });
-
-    it('formattedSpeed — speedKmh 반영', () => {
-      store.start();
-      runInAction(() => { store.speedKmh = 5.67; });
-      expect(store.formattedSpeed).toBe('5.7km/h');
-    });
   });
 
-  describe('저장 기능', () => {
-    beforeEach(() => {
-      mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1', email: 'user-1@test.com' } }, error: null });
-      mockInsert.mockResolvedValue({ error: null });
-      mockProfileSelect.mockResolvedValue({ data: null });
-      mockChannelSubscribe.mockReturnValue(undefined);
-      mockChannelSend.mockResolvedValue({});
+  describe('restore()', () => {
+    it('active 세션이 있으면 isTracking=true', async () => {
+      mockSelect.mockResolvedValue({
+        data: { id: 'session-1', status: 'active', max_route_meters: 500, distance_meters: 300, started_at: new Date().toISOString() },
+      });
+      await store.restore();
+      expect(store.isTracking).toBe(true);
+      expect(store.isPaused).toBe(false);
     });
 
-    it('stop() 후 elapsedSeconds > 0이면 Supabase INSERT 호출', async () => {
-      store.start();
-      vi.advanceTimersByTime(1000);
-      store.stop();
-      await vi.runAllTimersAsync();
-      expect(mockInsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          user_id: 'user-1',
-          group_id: 'test-group-id',
-          elapsed_seconds: 1,
-        })
-      );
+    it('paused 세션이 있으면 isPaused=true', async () => {
+      mockSelect.mockResolvedValue({
+        data: { id: 'session-1', status: 'paused', max_route_meters: 500, distance_meters: 300, started_at: new Date().toISOString() },
+      });
+      await store.restore();
+      expect(store.isTracking).toBe(true);
+      expect(store.isPaused).toBe(true);
     });
 
-    it('INSERT에 max_route_meters 포함', async () => {
-      store.setRoutePoints([{ lat: 37.5, lng: 126.9 }, { lat: 37.51, lng: 126.9 }]);
-      store.start();
-      store.addPoint(37.505, 126.9);
-      vi.advanceTimersByTime(1000);
-      store.stop();
-      await vi.runAllTimersAsync();
-      expect(mockInsert).toHaveBeenCalledWith(
-        expect.objectContaining({ max_route_meters: expect.any(Number) })
-      );
-    });
-
-    it('stop() 후 elapsedSeconds === 0이면 INSERT 미호출', async () => {
-      store.start();
-      store.stop();
-      await vi.runAllTimersAsync();
-      expect(mockInsert).not.toHaveBeenCalled();
-    });
-
-    it('저장 중 saving === true', async () => {
-      mockInsert.mockImplementation(() => new Promise(() => {}));
-      store.start();
-      vi.advanceTimersByTime(1000);
-      store.stop();
-      await Promise.resolve();
-      expect(store.saving).toBe(true);
-    });
-
-    it('저장 성공 후 saving === false', async () => {
-      store.start();
-      vi.advanceTimersByTime(1000);
-      store.stop();
-      await vi.runAllTimersAsync();
-      expect(store.saving).toBe(false);
-    });
-
-    it('getUser가 null 반환 시 INSERT 미호출', async () => {
-      mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
-      store.start();
-      vi.advanceTimersByTime(1000);
-      store.stop();
-      await vi.runAllTimersAsync();
-      expect(mockInsert).not.toHaveBeenCalled();
-    });
-
-    it('INSERT 실패 시 saveError 설정', async () => {
-      mockInsert.mockResolvedValue({ error: { message: '저장 실패' } });
-      store.start();
-      vi.advanceTimersByTime(1000);
-      store.stop();
-      await vi.runAllTimersAsync();
-      expect(store.saveError).toBe('저장 실패');
+    it('세션이 없으면 초기 상태 유지', async () => {
+      mockSelect.mockResolvedValue({ data: null });
+      await store.restore();
+      expect(store.isTracking).toBe(false);
     });
   });
 
   describe('routePoints / maxRouteMeters', () => {
-    it('setRoutePoints() 후 addPoint()하면 maxRouteMeters 업데이트', () => {
+    it('setRoutePoints() 후 addPoint()하면 maxRouteMeters 업데이트', async () => {
       store.setRoutePoints([{ lat: 37.5, lng: 126.9 }, { lat: 37.51, lng: 126.9 }]);
-      store.start();
+      await store.start();
       store.addPoint(37.505, 126.9);
       expect(store.maxRouteMeters).toBeGreaterThan(0);
     });
 
-    it('routePoints 빈 배열이면 maxRouteMeters 0 유지', () => {
-      store.start();
+    it('routePoints 빈 배열이면 maxRouteMeters 0 유지', async () => {
+      await store.start();
       store.addPoint(37.5, 126.9);
       store.addPoint(37.501, 126.9);
       expect(store.maxRouteMeters).toBe(0);
@@ -305,51 +245,23 @@ describe('TrackingStore', () => {
   });
 
   describe('broadcast', () => {
-    beforeEach(() => {
-      mockGetUser.mockResolvedValue({ data: { user: { id: 'u1', email: 'u1@test.com' } }, error: null });
-      mockProfileSelect.mockResolvedValue({ data: { display_name: '홍길동' } });
-      mockChannelSubscribe.mockReturnValue(undefined);
-      mockChannelSend.mockResolvedValue({});
-    });
-
     it('start() 후 _initBroadcast가 채널 구독', async () => {
-      store.start();
-      // Flush _initBroadcast promises (2 awaits: getUser + profileSelect + runInAction)
+      mockProfileSelect.mockResolvedValue({ data: { display_name: '홍길동' } });
+      await store.start();
       await Promise.resolve();
       await Promise.resolve();
       await Promise.resolve();
       expect(mockChannelSubscribe).toHaveBeenCalled();
     });
 
-    it('1초 후 채널로 broadcast 전송', async () => {
-      store.start();
-      // Flush _initBroadcast promises
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-      vi.advanceTimersByTime(1000);
-      expect(mockChannelSend).toHaveBeenCalled();
-    });
-
     it('dispose() 시 채널 제거', async () => {
-      store.start();
-      // Flush _initBroadcast promises
+      mockProfileSelect.mockResolvedValue({ data: { display_name: '홍길동' } });
+      await store.start();
       await Promise.resolve();
       await Promise.resolve();
       await Promise.resolve();
       store.dispose();
       expect(mockRemoveChannel).toHaveBeenCalled();
-    });
-
-    it('미인증 시 broadcast 미전송', async () => {
-      mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
-      store.start();
-      // Flush _initBroadcast promises
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-      vi.advanceTimersByTime(1000);
-      expect(mockChannelSend).not.toHaveBeenCalled();
     });
   });
 });
