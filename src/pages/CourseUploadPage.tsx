@@ -3,8 +3,10 @@ import { useRef, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
 import { toast } from 'sonner';
+import { Upload } from 'lucide-react';
 import { CourseUploadStore } from '../stores/CourseUploadStore';
 import { MapStore } from '../stores/MapStore';
+import { NavigationBar } from '../components/NavigationBar';
 
 const DIFFICULTY_TAGS = ['쉬움', '보통', '어려움'];
 const TERRAIN_TAGS = ['산악', '도심', '해안', '평지'];
@@ -17,7 +19,6 @@ export const CourseUploadPage = observer(() => {
   const [mapReady, setMapReady] = useState(false);
   const [gpxText, setGpxText] = useState<string | null>(null);
 
-  // Init map once
   useEffect(() => {
     if (!mapRef.current) return;
     mapStore.initMap(mapRef.current);
@@ -25,7 +26,6 @@ export const CourseUploadPage = observer(() => {
     return () => mapStore.destroy();
   }, [mapStore]);
 
-  // Draw route when GPX parsed and map ready
   useEffect(() => {
     if (mapReady && gpxText) {
       mapStore.drawGpxRoute(gpxText);
@@ -52,82 +52,72 @@ export const CourseUploadPage = observer(() => {
 
   return (
     <div className="h-full bg-white flex flex-col">
-      {/* Header */}
-      <div className="flex items-center px-2 py-2 border-b border-neutral-200">
-        <button
-          onClick={() => navigate('/course')}
-          className="flex items-center justify-center w-11 h-11 rounded-full text-black active:bg-neutral-100 transition-colors"
-          aria-label="뒤로"
-        >
-          <svg width="11" height="19" viewBox="0 0 11 19" fill="none" aria-hidden="true">
-            <path d="M9.5 1.5L1.5 9.5L9.5 17.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
-        <h1 className="flex-1 text-center text-base font-semibold">코스 업로드</h1>
-        <div className="w-11" />
-      </div>
+      <NavigationBar title="코스 업로드" onBack={() => navigate('/course')} />
 
       <div className="flex-1 overflow-y-auto">
         {/* Map preview */}
         <div
           ref={mapRef}
           data-testid="map-container"
-          className="w-full bg-neutral-100"
+          className="w-full bg-[#f3f3f0]"
           style={{ height: 200 }}
         />
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-4">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5 p-5">
           {/* GPX file */}
-          <div className="flex flex-col gap-1">
-            <label className="text-sm text-neutral-500">GPX 파일</label>
-            <label className="bg-neutral-100 rounded-lg px-3 py-2 text-sm border border-neutral-200 cursor-pointer flex items-center">
-              <span className="text-neutral-500">
-                {store.file ? store.file.name : '파일 선택'}
-              </span>
-              <input type="file" accept=".gpx" className="hidden" onChange={handleFileChange} />
-            </label>
-            {store.gpxError && (
-              <p className="text-xs text-red-500">{store.gpxError}</p>
+          <label className="flex flex-col items-center justify-center bg-black/[0.02] rounded-2xl px-4 py-6 border border-dashed border-black/10 cursor-pointer hover:border-black/20 transition-colors">
+            <Upload size={20} className="text-black/25 mb-2" />
+            <span className="text-[13px] font-semibold text-black/50">
+              {store.file ? store.file.name : 'GPX 파일을 선택하세요'}
+            </span>
+            {!store.file && (
+              <span className="text-[11px] text-black/25 mt-1">.gpx 파일만 지원됩니다</span>
             )}
-          </div>
+            <input type="file" accept=".gpx" className="hidden" onChange={handleFileChange} />
+          </label>
+          {store.gpxError && (
+            <p className="text-[12px] text-red-500 -mt-3">{store.gpxError}</p>
+          )}
 
           {/* Name */}
-          <div className="flex flex-col gap-1">
-            <label className="text-sm text-neutral-500">코스 이름 <span className="text-red-400">*</span></label>
+          <div className="flex flex-col gap-2">
+            <label className="text-[13px] font-semibold text-black/50">
+              코스 이름 <span className="text-red-400">*</span>
+            </label>
             <input
               type="text"
               value={store.name}
               onChange={(e) => store.setName(e.target.value)}
               placeholder="코스 이름을 입력하세요"
-              className="bg-neutral-100 rounded-lg px-3 py-2 text-sm border border-neutral-200 outline-none focus:border-black"
+              className="bg-black/[0.03] rounded-xl px-4 py-3 text-[15px] border border-black/[0.06] outline-none focus:border-black/20 transition-colors placeholder:text-black/25"
             />
           </div>
 
           {/* Description */}
-          <div className="flex flex-col gap-1">
-            <label className="text-sm text-neutral-500">설명</label>
+          <div className="flex flex-col gap-2">
+            <label className="text-[13px] font-semibold text-black/50">설명</label>
             <textarea
               value={store.description}
               onChange={(e) => store.setDescription(e.target.value)}
               placeholder="코스 설명을 입력하세요 (선택)"
               rows={3}
-              className="bg-neutral-100 rounded-lg px-3 py-2 text-sm border border-neutral-200 outline-none focus:border-black resize-none"
+              className="bg-black/[0.03] rounded-xl px-4 py-3 text-[15px] border border-black/[0.06] outline-none focus:border-black/20 transition-colors resize-none placeholder:text-black/25"
             />
           </div>
 
           {/* Difficulty tags */}
           <div className="flex flex-col gap-2">
-            <label className="text-sm text-neutral-500">난이도</label>
+            <label className="text-[13px] font-semibold text-black/50">난이도</label>
             <div className="flex gap-2">
               {DIFFICULTY_TAGS.map((tag) => (
                 <button
                   key={tag}
                   type="button"
                   onClick={() => store.tags.includes(tag) ? store.removeTag(tag) : store.addTag(tag)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  className={`px-4 py-2 rounded-full text-[13px] font-semibold transition-all ${
                     store.tags.includes(tag)
-                      ? 'bg-black text-white border-black'
-                      : 'bg-white text-neutral-600 border-neutral-200'
+                      ? 'bg-black text-white'
+                      : 'bg-black/[0.04] text-black/40'
                   }`}
                 >
                   {tag}
@@ -138,17 +128,17 @@ export const CourseUploadPage = observer(() => {
 
           {/* Terrain tags */}
           <div className="flex flex-col gap-2">
-            <label className="text-sm text-neutral-500">지형</label>
+            <label className="text-[13px] font-semibold text-black/50">지형</label>
             <div className="flex gap-2 flex-wrap">
               {TERRAIN_TAGS.map((tag) => (
                 <button
                   key={tag}
                   type="button"
                   onClick={() => store.tags.includes(tag) ? store.removeTag(tag) : store.addTag(tag)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  className={`px-4 py-2 rounded-full text-[13px] font-semibold transition-all ${
                     store.tags.includes(tag)
-                      ? 'bg-black text-white border-black'
-                      : 'bg-white text-neutral-600 border-neutral-200'
+                      ? 'bg-black text-white'
+                      : 'bg-black/[0.04] text-black/40'
                   }`}
                 >
                   {tag}
@@ -160,30 +150,30 @@ export const CourseUploadPage = observer(() => {
           {/* Public toggle */}
           <div className="flex items-center justify-between py-1">
             <div>
-              <p className="text-sm text-neutral-700">공개 코스</p>
-              <p className="text-xs text-neutral-400">공개하면 다른 사용자도 이 코스를 볼 수 있습니다</p>
+              <p className="text-[14px] font-medium text-black/80">공개 코스</p>
+              <p className="text-[12px] text-black/35">공개하면 다른 사용자도 이 코스를 볼 수 있습니다</p>
             </div>
             <button
               type="button"
               onClick={() => store.setIsPublic(!store.isPublic)}
-              className={`relative w-11 h-6 rounded-full transition-colors ${store.isPublic ? 'bg-black' : 'bg-neutral-300'}`}
+              className={`relative w-[46px] h-[26px] rounded-full transition-colors ${store.isPublic ? 'bg-black' : 'bg-black/15'}`}
               aria-label="공개 여부 토글"
             >
               <span
-                className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${store.isPublic ? 'translate-x-5' : 'translate-x-0.5'}`}
+                className={`absolute top-[3px] w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${store.isPublic ? 'translate-x-[23px]' : 'translate-x-[3px]'}`}
               />
             </button>
           </div>
 
           {/* Submit */}
-          <div className="pt-2">
+          <div className="pt-1">
             <button
               type="submit"
               disabled={!store.isValid || store.submitting}
-              className="w-full py-3 rounded-xl bg-black text-white font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-3.5 rounded-xl bg-black text-white font-semibold text-[15px] disabled:opacity-30 flex items-center justify-center gap-2 active:bg-black/80 transition-colors"
             >
               {store.submitting && (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               )}
               업로드
             </button>

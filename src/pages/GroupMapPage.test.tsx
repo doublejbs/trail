@@ -10,6 +10,7 @@ const FAKE_GROUP: Group = {
   created_by: 'user-1',
   gpx_path: 'user-1/group-uuid-1.gpx',
   gpx_bucket: 'gpx-files',
+  thumbnail_path: null,
   created_at: '2026-01-01T00:00:00Z',
   max_members: null,
   period_started_at: null,

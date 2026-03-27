@@ -9,7 +9,7 @@ export function MainLayout() {
 
   return (
     <div className="relative h-screen bg-white overflow-hidden">
-      <div className={`absolute inset-0 ${showTabBar ? 'pb-24' : ''}`}>
+      <div className={`absolute inset-0 ${showTabBar ? 'pb-[72px]' : ''}`}>
         <Outlet />
       </div>
       {showTabBar && <BottomTabBar />}

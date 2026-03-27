@@ -1,11 +1,57 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
-import { Plus } from 'lucide-react';
+import { Plus, ChevronRight } from 'lucide-react';
 import { GroupStore } from '../stores/GroupStore';
-import { Button } from '@/components/ui/button';
-import { ButtonGroup } from '@/components/ui/button-group';
 import { LargeTitle } from '../components/LargeTitle';
+import { supabase } from '../lib/supabase';
+import type { Group } from '../types/group';
+
+function GroupThumbnail({ group }: { group: Group }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!group.thumbnail_path) return;
+    const el = ref.current;
+    if (!el) return;
+
+    const bucket = group.thumbnail_path.endsWith('_thumb.png') && group.gpx_bucket === 'gpx-files'
+      ? 'gpx-files'
+      : 'course-gpx';
+
+    const observer = new IntersectionObserver(
+      async ([entry], obs) => {
+        if (!entry?.isIntersecting) return;
+        obs.disconnect();
+        try {
+          const { data, error } = await supabase.storage
+            .from(bucket)
+            .createSignedUrl(group.thumbnail_path!, 3600);
+          if (!error && data?.signedUrl) setUrl(data.signedUrl);
+        } catch { /* ignore */ }
+      },
+      { rootMargin: '200px', threshold: 0 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [group.thumbnail_path, group.gpx_bucket]);
+
+  return (
+    <div
+      ref={ref}
+      className="w-12 h-12 rounded-xl overflow-hidden bg-black/[0.04] flex items-center justify-center shrink-0"
+    >
+      {url ? (
+        <img src={url} alt={group.name} className="w-full h-full object-cover" />
+      ) : (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M4 18L8 10L12 14L16 6L20 12" stroke="black" strokeOpacity="0.25" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      )}
+    </div>
+  );
+}
 
 export const GroupPage = observer(() => {
   const navigate = useNavigate();
@@ -18,7 +64,7 @@ export const GroupPage = observer(() => {
   if (store.loading) {
     return (
       <div className="h-full flex items-center justify-center bg-white">
-        <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin" />
+        <div className="w-5 h-5 border-2 border-black/20 border-t-black rounded-full animate-spin" />
       </div>
     );
   }
@@ -26,7 +72,7 @@ export const GroupPage = observer(() => {
   if (store.error) {
     return (
       <div className="h-full flex items-center justify-center bg-white">
-        <p className="text-sm text-neutral-400">그룹을 불러올 수 없습니다</p>
+        <p className="text-[13px] text-black/35">그룹을 불러올 수 없습니다</p>
       </div>
     );
   }
@@ -45,58 +91,70 @@ export const GroupPage = observer(() => {
 
   return (
     <div className="h-full flex flex-col bg-white">
-      {/* Group list */}
-      <div className="flex-1 overflow-y-auto pb-2">
+      <div className="flex-1 overflow-y-auto">
         <LargeTitle title="그룹" />
+
+        {/* Segmented control */}
+        <div className="flex gap-2 px-5 pb-3">
+          <button
+            onClick={() => store.setActiveTab('owned')}
+            aria-pressed={store.activeTab === 'owned'}
+            className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
+              store.activeTab === 'owned'
+                ? 'bg-black text-white'
+                : 'bg-black/[0.05] text-black/45'
+            }`}
+          >
+            내가 만든
+          </button>
+          <button
+            onClick={() => store.setActiveTab('joined')}
+            aria-pressed={store.activeTab === 'joined'}
+            className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
+              store.activeTab === 'joined'
+                ? 'bg-black text-white'
+                : 'bg-black/[0.05] text-black/45'
+            }`}
+          >
+            참여중
+          </button>
+        </div>
+
+        {/* Group list */}
         {visibleGroups.length === 0 ? (
-          <div className="h-full flex items-center justify-center">
-            <p className="text-sm text-neutral-400">{emptyMessage}</p>
+          <div className="flex flex-col items-center justify-center pt-20 gap-3">
+            <div className="w-12 h-12 rounded-full bg-black/[0.04] flex items-center justify-center">
+              <Plus size={20} className="text-black/20" />
+            </div>
+            <p className="text-[13px] text-black/35">{emptyMessage}</p>
           </div>
         ) : (
-          visibleGroups.map((group) => (
-            <button
-              key={group.id}
-              onClick={() => navigate(`/group/${group.id}`)}
-              className="w-full px-4 py-4 text-left text-black border-b border-neutral-200 active:bg-neutral-100"
-            >
-              {group.name}
-            </button>
-          ))
+          <div className="px-5 flex flex-col gap-2">
+            {visibleGroups.map((group) => (
+              <button
+                key={group.id}
+                onClick={() => navigate(`/group/${group.id}`)}
+                className="w-full flex items-center justify-between bg-white border border-black/[0.06] rounded-2xl px-4 py-3 text-left active:bg-black/[0.02] transition-colors"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <GroupThumbnail group={group} />
+                  <span className="text-[15px] font-semibold text-black truncate">{group.name}</span>
+                </div>
+                <ChevronRight size={18} className="text-black/20 shrink-0" />
+              </button>
+            ))}
+          </div>
         )}
       </div>
 
-      {/* Bottom control bar */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-t border-neutral-200 bg-white shrink-0">
-        {/* Segmented chip */}
-        <div className="flex-1 flex justify-center">
-          <ButtonGroup className="bg-neutral-100 p-0.5">
-            <Button
-              onClick={() => store.setActiveTab('owned')}
-              aria-pressed={store.activeTab === 'owned'}
-              variant={store.activeTab === 'owned' ? 'default' : 'ghost'}
-              size="sm"
-              className={store.activeTab !== 'owned' ? 'text-neutral-400' : ''}
-            >
-              내가 만든
-            </Button>
-            <Button
-              onClick={() => store.setActiveTab('joined')}
-              aria-pressed={store.activeTab === 'joined'}
-              variant={store.activeTab === 'joined' ? 'default' : 'ghost'}
-              size="sm"
-              className={store.activeTab !== 'joined' ? 'text-neutral-400' : ''}
-            >
-              참여중
-            </Button>
-          </ButtonGroup>
-        </div>
-        {/* FAB */}
+      {/* FAB */}
+      <div className="absolute right-5 bottom-24">
         <button
           onClick={() => navigate('/group/new')}
           aria-label="그룹 만들기"
-          className="w-12 h-12 bg-black text-white rounded-full flex items-center justify-center shadow-lg active:bg-neutral-800"
+          className="w-14 h-14 bg-black text-white rounded-full flex items-center justify-center shadow-lg shadow-black/20 active:scale-95 transition-transform"
         >
-          <Plus size={22} />
+          <Plus size={24} strokeWidth={2.2} />
         </button>
       </div>
     </div>

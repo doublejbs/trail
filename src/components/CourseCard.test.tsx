@@ -20,6 +20,7 @@ const COURSE: Course = {
   description: null,
   tags: ['어려움'],
   gpx_path: 'u1/c1.gpx',
+  thumbnail_path: null,
   distance_m: 8500,
   elevation_gain_m: 450,
   is_public: true,

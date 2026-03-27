@@ -5,6 +5,7 @@ export interface Course {
   description: string | null;
   tags: string[] | null;
   gpx_path: string;
+  thumbnail_path: string | null;
   distance_m: number | null;
   elevation_gain_m: number | null;
   is_public: boolean;

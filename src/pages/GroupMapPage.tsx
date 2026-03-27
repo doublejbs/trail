@@ -4,7 +4,7 @@ import { observer } from 'mobx-react-lite';
 import { NavigationBar } from '../components/NavigationBar';
 import { runInAction, autorun, reaction } from 'mobx';
 import { Button } from '@/components/ui/button';
-import { Crosshair, Trophy, X } from 'lucide-react';
+import { Crosshair, Trophy, X, Settings } from 'lucide-react';
 import { MapStore } from '../stores/MapStore';
 import { GroupMapStore } from '../stores/GroupMapStore';
 import { TrackingStore } from '../stores/TrackingStore';
@@ -32,53 +32,43 @@ export const GroupMapPage = observer(() => {
     [routePoints]
   );
 
-  // Effect 1: 데이터 fetch
   useEffect(() => {
     if (!id) return;
     return store.load(id);
   }, [store, id]);
 
-  // Effect 2: 지도 초기화 + GPX 렌더링
   useEffect(() => {
     if (!mapRef.current || store.gpxText === undefined || store.group === undefined || store.group === null) {
       return () => { mapStore.destroy(); };
     }
-
     mapStore.initMap(mapRef.current);
     mapStore.startWatchingLocation((lat, lng) => trackingStore.addPoint(lat, lng));
-
     if (store.gpxText !== null) {
       mapStore.drawGpxRoute(store.gpxText);
     } else {
       runInAction(() => { mapStore.error = true; });
     }
-
     return () => { mapStore.destroy(); };
   }, [mapStore, trackingStore, store.gpxText, store.group]);
 
-  // Effect 3: TrackingStore routePoints 주입
   useEffect(() => {
     if (routePoints.length > 0) trackingStore.setRoutePoints(routePoints);
   }, [trackingStore, routePoints]);
 
-  // Effect 4: LeaderboardStore 로드
   useEffect(() => {
     if (store.group != null && store.gpxText != null) {
       void leaderboardStore.load(store.periodStartedAt ?? null);
     }
   }, [leaderboardStore, store.group, store.gpxText, store.periodStartedAt]);
 
-  // Effect 5: TrackingStore 정리
   useEffect(() => {
     return () => { trackingStore.dispose(); };
   }, [trackingStore]);
 
-  // Effect 6: LeaderboardStore 정리
   useEffect(() => {
     return () => { leaderboardStore.dispose(); };
   }, [leaderboardStore]);
 
-  // Effect 7: 다른 멤버 위치 마커 갱신
   useEffect(() => {
     const disposer = autorun(() => {
       leaderboardStore.rankings.forEach((r) => {
@@ -91,7 +81,6 @@ export const GroupMapPage = observer(() => {
     return disposer;
   }, [leaderboardStore, mapStore, store]);
 
-  // Effect 8: period broadcast 구독 + 리더보드 재로드
   useEffect(() => {
     if (!id || store.group == null) return;
     const unsubscribe = store.subscribeToPeriodEvents();
@@ -110,17 +99,17 @@ export const GroupMapPage = observer(() => {
 
   if (store.group === undefined || store.gpxText === undefined) {
     return (
-      <div className="absolute inset-0 flex items-center justify-center bg-black">
+      <div className="absolute inset-0 flex items-center justify-center bg-white">
         <div
           role="status"
-          className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"
+          className="w-5 h-5 border-2 border-black/15 border-t-black rounded-full animate-spin"
         />
       </div>
     );
   }
 
   const isAdmin = store.currentUserId === store.group.created_by;
-  const bottomOffset = (trackingStore.isTracking || trackingStore.saving) ? 'bottom-36' : 'bottom-20';
+  const bottomOffset = (trackingStore.isTracking || trackingStore.saving) ? 'bottom-44' : 'bottom-24';
 
   const displayRankings = (() => {
     if (!trackingStore.isTracking || !store.currentUserId) return leaderboardStore.rankings;
@@ -149,44 +138,44 @@ export const GroupMapPage = observer(() => {
 
   return (
     <div className="absolute inset-0">
-      {/* 네이버 지도 컨테이너 */}
+      {/* Map container */}
       <div
         ref={mapRef}
         data-testid="map-container"
         className="absolute inset-0 w-full h-full"
       />
 
-      {/* 에러 오버레이 */}
+      {/* Error overlay */}
       {mapStore.error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-neutral-100">
-          <p className="text-sm text-neutral-500">지도를 불러올 수 없습니다</p>
+        <div className="absolute inset-0 flex items-center justify-center bg-white">
+          <p className="text-[13px] text-black/35">지도를 불러올 수 없습니다</p>
         </div>
       )}
 
-      {/* 코스로 돌아가기 버튼 */}
+      {/* Return to course */}
       {mapStore.map && !mapStore.isCourseVisible && (
         <div className={`absolute ${bottomOffset} left-1/2 -translate-x-1/2 z-10`}>
           <button
             onClick={() => mapStore.returnToCourse()}
-            className="bg-white/90 text-black px-4 py-2 rounded-full text-sm font-medium shadow-md whitespace-nowrap"
+            className="bg-white text-black px-5 py-2.5 rounded-full text-[13px] font-semibold shadow-lg shadow-black/10 whitespace-nowrap border border-black/[0.06]"
           >
             코스로 돌아가기
           </button>
         </div>
       )}
 
-      {/* 순위 + 내 위치 버튼 (우측 하단) */}
+      {/* Side action buttons */}
       {mapStore.map && (
-        <div className={`absolute right-3 ${bottomOffset} z-10 flex flex-col gap-2`}>
+        <div className={`absolute right-4 ${bottomOffset} z-10 flex flex-col gap-2`}>
           <Button
             variant="secondary"
             size="icon"
             onClick={() => setActiveTab(activeTab === 'leaderboard' ? 'map' : 'leaderboard')}
             onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); setActiveTab(activeTab === 'leaderboard' ? 'map' : 'leaderboard'); }}
             aria-label="순위"
-            className={`shadow-md ${activeTab === 'leaderboard' ? 'bg-black text-white hover:bg-neutral-800' : 'bg-white hover:bg-neutral-50'}`}
+            className={`rounded-xl shadow-lg shadow-black/10 border border-black/[0.06] ${activeTab === 'leaderboard' ? 'bg-black text-white hover:bg-black/90' : 'bg-white hover:bg-white'}`}
           >
-            <Trophy size={18} className={activeTab === 'leaderboard' ? 'text-white' : 'text-neutral-700'} />
+            <Trophy size={18} className={activeTab === 'leaderboard' ? 'text-white' : 'text-black/60'} />
           </Button>
           <Button
             variant="secondary"
@@ -194,21 +183,21 @@ export const GroupMapPage = observer(() => {
             onClick={() => mapStore.locate()}
             onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); mapStore.locate(); }}
             aria-label="내 위치"
-            className="bg-white hover:bg-neutral-50 shadow-md"
+            className="bg-white hover:bg-white rounded-xl shadow-lg shadow-black/10 border border-black/[0.06]"
           >
-            <Crosshair size={18} className="text-neutral-700" />
+            <Crosshair size={18} className="text-black/60" />
           </Button>
         </div>
       )}
 
-      {/* 트래킹 시작 버튼 + 관리자 활동 시작/종료 버튼 (지도 탭, 미추적 중) */}
+      {/* Tracking start + admin controls */}
       {!trackingStore.isTracking && !trackingStore.saving && activeTab === 'map' && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2">
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2.5">
           {isAdmin && !store.isPeriodActive && (
             <button
               onClick={() => void store.startPeriod()}
               onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); void store.startPeriod(); }}
-              className="bg-black text-white px-6 py-2 rounded-full text-sm font-semibold shadow-lg"
+              className="bg-white text-black px-6 py-2.5 rounded-full text-[13px] font-bold shadow-lg shadow-black/10 border border-black/[0.06]"
             >
               활동 시작
             </button>
@@ -217,7 +206,7 @@ export const GroupMapPage = observer(() => {
             <button
               onClick={() => void store.endPeriod()}
               onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); void store.endPeriod(); }}
-              className="bg-white text-black px-6 py-2 rounded-full text-sm font-semibold shadow-lg border border-neutral-200"
+              className="bg-white text-black/60 px-6 py-2.5 rounded-full text-[13px] font-bold shadow-lg shadow-black/10 border border-black/[0.06]"
             >
               활동 종료
             </button>
@@ -225,32 +214,34 @@ export const GroupMapPage = observer(() => {
           <button
             onClick={() => trackingStore.start()}
             onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); trackingStore.start(); }}
-            className="bg-black text-white px-8 py-3 rounded-full text-sm font-semibold shadow-lg"
+            className="bg-black text-white px-10 py-3.5 rounded-full text-[15px] font-bold shadow-lg shadow-black/25 active:scale-95 transition-transform"
           >
-            ● 시작
+            시작
           </button>
         </div>
       )}
 
-      {/* 트래킹 중 통계 패널 */}
+      {/* Tracking stats panel */}
       {(trackingStore.isTracking || trackingStore.saving) && (
-        <div className="absolute bottom-6 left-4 right-4 z-10 bg-white/90 rounded-2xl shadow-lg px-4 py-3">
-          <div className="flex justify-around text-center mb-2">
+        <div className="absolute bottom-6 left-4 right-4 z-10 bg-white rounded-2xl shadow-xl shadow-black/10 border border-black/[0.06] px-5 py-4">
+          <div className="flex justify-around text-center mb-3">
             <div>
-              <p className="text-base font-semibold tabular-nums">{trackingStore.formattedTime}</p>
-              <p className="text-xs text-neutral-500">시간</p>
+              <p className="text-[18px] font-bold tabular-nums text-black">{trackingStore.formattedTime}</p>
+              <p className="text-[11px] text-black/35 font-medium">시간</p>
             </div>
+            <div className="w-px bg-black/[0.06]" />
             <div>
-              <p className="text-base font-semibold tabular-nums">{trackingStore.formattedDistance}</p>
-              <p className="text-xs text-neutral-500">거리</p>
+              <p className="text-[18px] font-bold tabular-nums text-black">{trackingStore.formattedDistance}</p>
+              <p className="text-[11px] text-black/35 font-medium">거리</p>
             </div>
+            <div className="w-px bg-black/[0.06]" />
             <div>
-              <p className="text-base font-semibold tabular-nums">{trackingStore.formattedSpeed}</p>
-              <p className="text-xs text-neutral-500">속도</p>
+              <p className="text-[18px] font-bold tabular-nums text-black">{trackingStore.formattedSpeed}</p>
+              <p className="text-[11px] text-black/35 font-medium">속도</p>
             </div>
           </div>
           {trackingStore.saving && (
-            <button disabled className="w-full py-2 rounded-xl text-sm font-semibold bg-neutral-300 text-neutral-500 cursor-not-allowed">
+            <button disabled className="w-full py-3 rounded-xl text-[14px] font-semibold bg-black/[0.06] text-black/30 cursor-not-allowed">
               저장 중...
             </button>
           )}
@@ -258,9 +249,9 @@ export const GroupMapPage = observer(() => {
             <button
               onClick={() => trackingStore.pause()}
               onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); trackingStore.pause(); }}
-              className="w-full py-2 rounded-xl text-sm font-semibold bg-neutral-400 text-white"
+              className="w-full py-3 rounded-xl text-[14px] font-semibold bg-black/[0.08] text-black/60"
             >
-              ⏸ 일시정지
+              일시정지
             </button>
           )}
           {!trackingStore.saving && trackingStore.isPaused && (
@@ -268,43 +259,47 @@ export const GroupMapPage = observer(() => {
               <button
                 onClick={() => trackingStore.resume()}
                 onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); trackingStore.resume(); }}
-                className="flex-1 py-2 rounded-xl text-sm font-semibold bg-black text-white"
+                className="flex-1 py-3 rounded-xl text-[14px] font-semibold bg-black text-white"
               >
-                ▶ 재개
+                재개
               </button>
               <button
                 onClick={() => trackingStore.stop()}
                 onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); trackingStore.stop(); }}
-                className="flex-1 py-2 rounded-xl text-sm font-semibold bg-red-500 text-white"
+                className="flex-1 py-3 rounded-xl text-[14px] font-semibold bg-red-500 text-white"
               >
-                ■ 종료
+                종료
               </button>
             </div>
           )}
         </div>
       )}
 
-      {/* 순위 패널 (순위 탭) */}
+      {/* Leaderboard panel */}
       {activeTab === 'leaderboard' && (
-        <div data-testid="leaderboard-panel" className="absolute bottom-6 left-4 right-4 top-20 z-10 bg-white rounded-2xl shadow-lg overflow-hidden flex flex-col">
-          {/* 헤더 */}
-          <div className="flex items-center px-4 h-11 border-b border-neutral-200 shrink-0">
-            <span className="flex-1 text-hig-headline font-semibold">순위</span>
-            <span className={`text-xs font-medium px-2 py-0.5 rounded-full mr-2 ${store.isPeriodActive ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-500'}`}>
-              {store.isPeriodActive ? '● 활동 중' : '비활성'}
+        <div data-testid="leaderboard-panel" className="absolute bottom-6 left-4 right-4 top-20 z-10 bg-white rounded-2xl shadow-xl shadow-black/10 border border-black/[0.06] overflow-hidden flex flex-col">
+          {/* Header */}
+          <div className="flex items-center px-4 h-12 border-b border-black/[0.06] shrink-0">
+            <span className="flex-1 text-[15px] font-bold text-black">순위</span>
+            <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full mr-2 ${
+              store.isPeriodActive
+                ? 'bg-black text-white'
+                : 'bg-black/[0.05] text-black/35'
+            }`}>
+              {store.isPeriodActive ? '활동 중' : '비활성'}
             </span>
             <button
               onClick={() => setActiveTab('map')}
               aria-label="닫기"
-              className="w-8 h-8 flex items-center justify-center text-neutral-400 hover:text-neutral-900 -mr-1"
+              className="w-8 h-8 flex items-center justify-center text-black/30 hover:text-black -mr-1 min-h-0 min-w-0"
             >
               <X size={18} />
             </button>
           </div>
-          {/* 기간 정보 */}
+          {/* Period info */}
           {!store.isPeriodActive && (
-            <div className="px-4 py-2 border-b border-neutral-100">
-              <p className="text-xs text-neutral-500">
+            <div className="px-4 py-2.5 border-b border-black/[0.04] bg-black/[0.02]">
+              <p className="text-[11px] text-black/35">
                 {store.periodStartedAt
                   ? `활동 기간: ${store.periodStartedAt.toLocaleDateString()} ~ ${store.periodEndedAt?.toLocaleDateString() ?? ''}`
                   : '활동 기간이 없습니다'}
@@ -314,34 +309,37 @@ export const GroupMapPage = observer(() => {
           <div className="flex-1 overflow-y-auto">
             {leaderboardStore.loading && (
               <div className="flex justify-center py-8">
-                <div role="status" className="w-5 h-5 border-2 border-neutral-300 border-t-neutral-600 rounded-full animate-spin" />
+                <div role="status" className="w-5 h-5 border-2 border-black/15 border-t-black rounded-full animate-spin" />
               </div>
             )}
             {!leaderboardStore.loading && displayRankings.map((r: Ranking, i: number) => (
               <div
                 key={r.userId}
-                className={`flex items-center px-4 py-3 border-b border-neutral-100 ${r.userId === store.currentUserId ? 'bg-neutral-50' : ''}`}
+                className={`flex items-center px-4 py-3.5 border-b border-black/[0.04] ${
+                  r.userId === store.currentUserId ? 'bg-black/[0.02]' : ''
+                }`}
               >
-                <span className={`w-7 text-sm font-bold ${i === 0 ? 'text-black' : 'text-neutral-300'}`}>
+                <span className={`w-7 text-[14px] font-bold ${i === 0 ? 'text-black' : 'text-black/20'}`}>
                   {i + 1}
                 </span>
-                <span className="flex-1 text-sm font-medium text-neutral-800">{r.displayName}</span>
-                {r.isLive && <span className="text-xs text-neutral-500 mr-2">● 라이브</span>}
-                <span className="text-xs text-neutral-500 tabular-nums">
+                <span className="flex-1 text-[14px] font-medium text-black/80">{r.displayName}</span>
+                {r.isLive && (
+                  <span className="text-[11px] text-trail-green font-semibold mr-2">LIVE</span>
+                )}
+                <span className="text-[13px] text-black/40 tabular-nums font-semibold">
                   {formatProgress(r.maxRouteMeters)}
                 </span>
               </div>
             ))}
             {!leaderboardStore.loading && displayRankings.length === 0 && (
-              <p className="text-center text-sm text-neutral-400 py-8">아직 기록이 없습니다</p>
+              <p className="text-center text-[13px] text-black/30 py-8">아직 기록이 없습니다</p>
             )}
           </div>
         </div>
       )}
 
-
       <NavigationBar
-        title="그룹 지도"
+        title={store.group.name}
         onBack={() => navigate(-1)}
         overlay
         rightAction={
@@ -349,9 +347,9 @@ export const GroupMapPage = observer(() => {
             <button
               onClick={() => navigate(`/group/${id}/settings`)}
               aria-label="설정"
-              className="text-hig-headline min-h-0 min-w-0"
+              className="min-h-0 min-w-0 text-black/50 active:text-black/30"
             >
-              ⚙
+              <Settings size={20} />
             </button>
           ) : undefined
         }

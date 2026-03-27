@@ -2,6 +2,8 @@ import { makeAutoObservable, runInAction } from 'mobx';
 import type { NavigateFunction } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
+import { parseGpxCoords } from '../lib/gpx';
+import { generateThumbnail } from '../lib/thumbnail';
 import type { Course } from '../types/course';
 
 class GroupCreateStore {
@@ -88,6 +90,7 @@ class GroupCreateStore {
 
     let gpxPath: string;
     let gpxBucket: string;
+    let thumbnailPath: string | null = null;
 
     if (this.sourceMode === 'course') {
       const course = this.courses.find((c) => c.id === this.selectedCourseId);
@@ -101,6 +104,8 @@ class GroupCreateStore {
       }
       gpxPath = course.gpx_path;
       gpxBucket = 'course-gpx';
+      // 코스의 썸네일을 그대로 사용
+      thumbnailPath = course.thumbnail_path;
     } else {
       const path = `${userId}/${groupId}.gpx`;
       const { error: uploadError } = await supabase.storage
@@ -116,11 +121,38 @@ class GroupCreateStore {
       }
       gpxPath = path;
       gpxBucket = 'gpx-files';
+
+      // GPX 업로드 시 썸네일 생성
+      try {
+        const text = await this.file!.text();
+        const coords = parseGpxCoords(text);
+        if (coords && coords.length >= 2) {
+          const blob = await generateThumbnail(coords);
+          if (blob) {
+            const thumbPath = `${userId}/${groupId}_thumb.png`;
+            const { error: thumbError } = await supabase.storage
+              .from('gpx-files')
+              .upload(thumbPath, blob, { contentType: 'image/png' });
+            if (!thumbError) {
+              thumbnailPath = thumbPath;
+            }
+          }
+        }
+      } catch {
+        // 썸네일 생성 실패해도 그룹 생성은 진행
+      }
     }
 
     const { error: insertError } = await supabase
       .from('groups')
-      .insert({ id: groupId, name: this.name, created_by: userId, gpx_path: gpxPath, gpx_bucket: gpxBucket });
+      .insert({
+        id: groupId,
+        name: this.name,
+        created_by: userId,
+        gpx_path: gpxPath,
+        gpx_bucket: gpxBucket,
+        thumbnail_path: thumbnailPath,
+      });
 
     if (insertError) {
       runInAction(() => {

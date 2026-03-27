@@ -4,8 +4,8 @@ interface LargeTitleProps {
 
 export function LargeTitle({ title }: LargeTitleProps) {
   return (
-    <div className="px-4 pt-5 pb-2">
-      <h1 className="text-hig-title1">{title}</h1>
+    <div className="px-5 pt-14 pb-3">
+      <h1 className="text-[26px] font-extrabold tracking-tight text-black">{title}</h1>
     </div>
   );
 }

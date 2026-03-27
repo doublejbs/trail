@@ -2,6 +2,7 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 import { supabase } from '../lib/supabase';
 import { parseGpxCoords, computeDistanceM, computeElevationGainM } from '../lib/gpx';
+import { generateThumbnail } from '../lib/thumbnail';
 import type { GpxCoord } from '../lib/gpx';
 
 class CourseUploadStore {
@@ -72,9 +73,8 @@ class CourseUploadStore {
 
     const userId = userData.user.id;
     const courseId = crypto.randomUUID();
-    const path = `${userId}/${courseId}.gpx`;
+    const gpxPath = `${userId}/${courseId}.gpx`;
 
-    // Parse stats from file
     let distanceM: number | null = null;
     let elevationGainM: number | null = null;
     if (this.coords) {
@@ -84,7 +84,7 @@ class CourseUploadStore {
 
     const { error: uploadError } = await supabase.storage
       .from('course-gpx')
-      .upload(path, this.file!);
+      .upload(gpxPath, this.file!);
 
     if (uploadError) {
       runInAction(() => {
@@ -92,6 +92,20 @@ class CourseUploadStore {
         this.submitting = false;
       });
       return null;
+    }
+
+    let thumbnailPath: string | null = null;
+    if (this.coords && this.coords.length >= 2) {
+      const blob = await generateThumbnail(this.coords);
+      if (blob) {
+        const thumbPath = `${userId}/${courseId}_thumb.png`;
+        const { error: thumbError } = await supabase.storage
+          .from('course-gpx')
+          .upload(thumbPath, blob, { contentType: 'image/png' });
+        if (!thumbError) {
+          thumbnailPath = thumbPath;
+        }
+      }
     }
 
     const { error: insertError } = await supabase
@@ -102,7 +116,8 @@ class CourseUploadStore {
         name: this.name.trim(),
         description: this.description.trim() || null,
         tags: this.tags.length > 0 ? this.tags : null,
-        gpx_path: path,
+        gpx_path: gpxPath,
+        thumbnail_path: thumbnailPath,
         distance_m: distanceM,
         elevation_gain_m: elevationGainM,
         is_public: this.isPublic,
