@@ -2,20 +2,21 @@ import { makeAutoObservable, runInAction } from 'mobx';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 
-type Provider = 'google' | 'kakao';
+type LoginProvider = 'google' | 'kakao' | 'naver';
 
 class LoginStore {
-  public loadingProvider: Provider | null = null;
+  public loadingProvider: LoginProvider | null = null;
 
   public constructor() {
     makeAutoObservable(this);
   }
 
-  public async login(provider: Provider, redirectTo: string): Promise<void> {
+  public async login(provider: LoginProvider, redirectTo: string): Promise<void> {
     runInAction(() => { this.loadingProvider = provider; });
     try {
+      const providerKey = provider === 'naver' ? 'custom:naver' : provider;
       const { error } = await supabase.auth.signInWithOAuth({
-        provider,
+        provider: providerKey as 'google',
         options: { redirectTo },
       });
       if (error) throw error;

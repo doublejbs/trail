@@ -20,7 +20,7 @@ export const LoginPage = observer(() => {
     return <Navigate to="/" replace />;
   }
 
-  const handleLogin = (provider: 'google' | 'kakao') => {
+  const handleLogin = (provider: 'google' | 'kakao' | 'naver') => {
     const redirectTo = next
       ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
       : `${window.location.origin}/auth/callback`;
@@ -68,6 +68,19 @@ export const LoginPage = observer(() => {
           )}
           카카오로 시작하기
         </button>
+        <button
+          onClick={() => handleLogin('naver')}
+          disabled={store.isLoading}
+          aria-label="네이버로 로그인"
+          className="w-full h-[52px] flex items-center justify-center gap-2.5 rounded-xl bg-[#03C75A] text-[14px] font-semibold text-white active:bg-[#02b351] transition-colors disabled:opacity-50"
+        >
+          {store.loadingProvider === 'naver' ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <NaverIcon />
+          )}
+          네이버로 시작하기
+        </button>
       </div>
 
       <p className="text-[11px] text-black/25 mt-8 anim-fade-up-2">계속 진행하면 이용약관에 동의하는 것으로 간주됩니다</p>
@@ -90,6 +103,14 @@ function KakaoIcon() {
   return (
     <svg className="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" aria-hidden="true" fill="rgba(0,0,0,0.85)">
       <path d="M12 3C6.477 3 2 6.477 2 10.5c0 2.636 1.607 4.953 4.03 6.327L5.1 20.1a.375.375 0 0 0 .54.415L10.1 17.9A11.6 11.6 0 0 0 12 18c5.523 0 10-3.477 10-7.5S17.523 3 12 3z" />
+    </svg>
+  );
+}
+
+function NaverIcon() {
+  return (
+    <svg className="h-[18px] w-[18px] shrink-0" viewBox="0 0 24 24" aria-hidden="true" fill="white">
+      <path d="M16.273 12.845L7.376 3H3v18h4.727V11.155L16.624 21H21V3h-4.727z" />
     </svg>
   );
 }
