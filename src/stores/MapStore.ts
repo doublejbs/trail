@@ -8,6 +8,7 @@ class MapStore {
   public map: naver.maps.Map | null = null;
   public error: boolean = false;
   public gpxPolyline: naver.maps.Polyline | null = null;
+  private _extraPolylines: naver.maps.Polyline[] = [];
   public startMarker: naver.maps.Marker | null = null;
   public endMarker: naver.maps.Marker | null = null;
   public locationMarker: naver.maps.Marker | null = null;
@@ -85,47 +86,77 @@ class MapStore {
       return;
     }
 
-    const path = trkpts
+    const allPoints = trkpts
       .filter((pt) => {
         const lat = parseFloat(pt.getAttribute('lat') ?? '');
         const lon = parseFloat(pt.getAttribute('lon') ?? '');
         return !isNaN(lat) && !isNaN(lon);
       })
-      .map((pt) =>
-        new window.naver.maps.LatLng(
-          parseFloat(pt.getAttribute('lat')!),
-          parseFloat(pt.getAttribute('lon')!),
-        ),
-      );
+      .map((pt) => ({
+        lat: parseFloat(pt.getAttribute('lat')!),
+        lon: parseFloat(pt.getAttribute('lon')!),
+      }));
 
-    if (path.length === 0) {
+    if (allPoints.length === 0) {
       this.error = true;
       return;
     }
 
-    const polyline = new window.naver.maps.Polyline({
-      map: this.map,
-      path,
-      strokeColor: '#FF5722',
-      strokeWeight: 4,
-      strokeOpacity: 0.8,
-    });
-
     // 이전 경로/마커 정리 (재호출 시 leak 방지)
     this.gpxPolyline?.setMap(null);
+    this._extraPolylines.forEach((p) => p.setMap(null));
+    this._extraPolylines = [];
     this.startMarker?.setMap(null);
     this.startMarker = null;
     this.endMarker?.setMap(null);
     this.endMarker = null;
 
+    // 포인트 간 2km 이상 간격이면 세그먼트 분리
+    const GAP_THRESHOLD = 2000;
+    const segments: naver.maps.LatLng[][] = [[]];
+    for (let i = 0; i < allPoints.length; i++) {
+      const pt = new window.naver.maps.LatLng(allPoints[i].lat, allPoints[i].lon);
+      if (i > 0) {
+        const prev = allPoints[i - 1];
+        const dlat = allPoints[i].lat - prev.lat;
+        const dlon = allPoints[i].lon - prev.lon;
+        // 빠른 근사 거리 (정확한 haversine 대신)
+        const approxM = Math.sqrt(dlat * dlat + dlon * dlon) * 111_000;
+        if (approxM > GAP_THRESHOLD) {
+          segments.push([]);
+        }
+      }
+      segments[segments.length - 1].push(pt);
+    }
+
+    // 각 세그먼트를 별도 폴리라인으로 그리기
+    const polylines: naver.maps.Polyline[] = [];
+    for (const seg of segments) {
+      if (seg.length < 2) continue;
+      polylines.push(new window.naver.maps.Polyline({
+        map: this.map,
+        path: seg,
+        strokeColor: '#FF5722',
+        strokeWeight: 4,
+        strokeOpacity: 0.8,
+      }));
+    }
+
+    // 첫 번째를 gpxPolyline으로, 나머지를 _extraPolylines로
+    const allPts = segments.flat();
+    if (polylines.length > 0) {
+      this.gpxPolyline = polylines[0];
+      this._extraPolylines = polylines.slice(1);
+    }
+
     // gpxBounds 계산
-    const bounds = path.reduce(
+    const bounds = allPts.reduce(
       (b, pt) => b.extend(pt),
-      new window.naver.maps.LatLngBounds(path[0], path[0]),
+      new window.naver.maps.LatLngBounds(allPts[0], allPts[0]),
     );
     this.gpxBounds = bounds;
 
-    this.map.setCenter(path[0]);
+    this.map.setCenter(allPts[0]);
 
     // 기존 idle 리스너 정리 후 재등록
     if (this.idleListener) {
@@ -144,21 +175,19 @@ class MapStore {
       },
     );
 
-    this.gpxPolyline = polyline;
-
     this.startMarker = new window.naver.maps.Marker({
       map: this.map,
-      position: path[0],
+      position: allPts[0],
       icon: {
         content: createPinHtml('#4CAF50'),
         anchor: new window.naver.maps.Point(10, 20),
       },
     });
 
-    if (path.length > 1) {
+    if (allPts.length > 1) {
       this.endMarker = new window.naver.maps.Marker({
         map: this.map,
-        position: path[path.length - 1],
+        position: allPts[allPts.length - 1],
         icon: {
           content: createPinHtml('#F44336'),
           anchor: new window.naver.maps.Point(10, 20),
@@ -176,6 +205,8 @@ class MapStore {
     this.isCourseVisible = true;
     this.gpxPolyline?.setMap(null);
     this.gpxPolyline = null;
+    this._extraPolylines.forEach((p) => p.setMap(null));
+    this._extraPolylines = [];
     this.startMarker?.setMap(null);
     this.startMarker = null;
     this.endMarker?.setMap(null);
