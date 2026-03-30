@@ -35,7 +35,7 @@ export function BottomTabBar() {
   const navigate = useNavigate();
 
   return (
-    <nav className="absolute bottom-0 left-0 right-0 bg-white border-t border-black/[0.06]">
+    <nav className="absolute bottom-0 left-0 right-0 bg-white border-t border-black/[0.06]" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="flex items-stretch">
         {TABS.map((tab) => {
           const active = isActive(tab.path, location.pathname);
@@ -43,7 +43,7 @@ export function BottomTabBar() {
             <button
               key={tab.path}
               onClick={() => navigate(tab.path)}
-              className="flex flex-1 flex-col items-center justify-center gap-0.5 pt-2 pb-7 transition-colors"
+              className="flex flex-1 flex-col items-center justify-center gap-0.5 pt-2 pb-2 transition-colors"
               aria-label={tab.label}
             >
               <span className={active ? 'text-black' : 'text-black/30'}>
