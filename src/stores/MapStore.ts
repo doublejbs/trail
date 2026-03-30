@@ -111,8 +111,6 @@ class MapStore {
       strokeOpacity: 0.8,
     });
 
-    this.map.setCenter(path[0]);
-
     // 이전 경로/마커 정리 (재호출 시 leak 방지)
     this.gpxPolyline?.setMap(null);
     this.startMarker?.setMap(null);
@@ -126,6 +124,8 @@ class MapStore {
       new window.naver.maps.LatLngBounds(path[0], path[0]),
     );
     this.gpxBounds = bounds;
+
+    this.map.setCenter(path[0]);
 
     // 기존 idle 리스너 정리 후 재등록
     if (this.idleListener) {

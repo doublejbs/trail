@@ -30,12 +30,12 @@ export const CoursePage = observer(() => {
       <LargeTitle title="탐색" />
 
       {/* Filter chips */}
-      <div className="flex gap-2 px-5 pb-3">
+      <div className="flex gap-1.5 px-5 pb-1.5">
         {FILTERS.map((f) => (
           <button
             key={f.key}
             onClick={() => handleFilterChange(f.key)}
-            className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
+            className={`px-4 py-1.5 rounded-full text-[13px] font-semibold min-h-0 min-w-0 transition-colors ${
               store.filter === f.key
                 ? 'bg-black text-white'
                 : 'bg-black/[0.05] text-black/45'

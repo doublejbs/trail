@@ -95,11 +95,11 @@ export const GroupPage = observer(() => {
         <LargeTitle title="그룹" />
 
         {/* Segmented control */}
-        <div className="flex gap-2 px-5 pb-3">
+        <div className="flex gap-1.5 px-5 pb-1.5">
           <button
             onClick={() => store.setActiveTab('owned')}
             aria-pressed={store.activeTab === 'owned'}
-            className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
+            className={`px-4 py-1.5 rounded-full text-[13px] font-semibold min-h-0 min-w-0 transition-colors ${
               store.activeTab === 'owned'
                 ? 'bg-black text-white'
                 : 'bg-black/[0.05] text-black/45'
@@ -110,7 +110,7 @@ export const GroupPage = observer(() => {
           <button
             onClick={() => store.setActiveTab('joined')}
             aria-pressed={store.activeTab === 'joined'}
-            className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-colors ${
+            className={`px-4 py-1.5 rounded-full text-[13px] font-semibold min-h-0 min-w-0 transition-colors ${
               store.activeTab === 'joined'
                 ? 'bg-black text-white'
                 : 'bg-black/[0.05] text-black/45'
