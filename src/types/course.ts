@@ -8,6 +8,9 @@ export interface Course {
   thumbnail_path: string | null;
   distance_m: number | null;
   elevation_gain_m: number | null;
+  region: string | null;
+  start_lat: number | null;
+  start_lng: number | null;
   is_public: boolean;
   created_at: string;
 }

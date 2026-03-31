@@ -3,6 +3,7 @@ import { makeAutoObservable, runInAction } from 'mobx';
 import { supabase } from '../lib/supabase';
 import { parseGpxCoords, computeDistanceM, computeElevationGainM } from '../lib/gpx';
 import { generateThumbnail } from '../lib/thumbnail';
+import { reverseGeocode } from '../lib/geocode';
 import type { GpxCoord } from '../lib/gpx';
 
 class CourseUploadStore {
@@ -10,6 +11,7 @@ class CourseUploadStore {
   public description: string = '';
   public tags: string[] = [];
   public isPublic: boolean = true;
+  public region: string = '';
   public file: File | null = null;
   public gpxError: string | null = null;
   public submitting: boolean = false;
@@ -24,6 +26,7 @@ class CourseUploadStore {
   public setName(v: string): void { this.name = v; }
   public setDescription(v: string): void { this.description = v; }
   public setIsPublic(v: boolean): void { this.isPublic = v; }
+  public setRegion(v: string): void { this.region = v; }
 
   public addTag(tag: string): void {
     if (!this.tags.includes(tag)) this.tags.push(tag);
@@ -48,6 +51,11 @@ class CourseUploadStore {
         this.coords = parsed;
       }
     });
+
+    if (parsed && parsed.length > 0) {
+      const region = await reverseGeocode(parsed[0].lat, parsed[0].lon);
+      runInAction(() => { if (region) this.region = region; });
+    }
   }
 
   public get isValid(): boolean {
@@ -120,6 +128,9 @@ class CourseUploadStore {
         thumbnail_path: thumbnailPath,
         distance_m: distanceM,
         elevation_gain_m: elevationGainM,
+        region: this.region.trim() || null,
+        start_lat: this.coords?.[0]?.lat ?? null,
+        start_lng: this.coords?.[0]?.lon ?? null,
         is_public: this.isPublic,
       });
 

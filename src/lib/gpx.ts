@@ -116,6 +116,8 @@ export function normaliseCoordsToSvgPoints(
 export interface ElevationPoint {
   distanceKm: number;
   elevationM: number;
+  lat: number;
+  lon: number;
 }
 
 export function buildElevationProfile(coords: GpxCoord[]): ElevationPoint[] | null {
@@ -148,7 +150,7 @@ export function buildElevationProfile(coords: GpxCoord[]): ElevationPoint[] | nu
       cumDistM += haversineM(coords[i - 1], coords[i]);
     }
     const distanceKm = Math.round((cumDistM / 1000) * 100) / 100;
-    result.push({ distanceKm, elevationM: eles[i] as number });
+    result.push({ distanceKm, elevationM: eles[i] as number, lat: coords[i].lat, lon: coords[i].lon });
   }
 
   return result;

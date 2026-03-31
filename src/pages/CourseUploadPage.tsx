@@ -63,7 +63,7 @@ export const CourseUploadPage = observer(() => {
           style={{ height: 200 }}
         />
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5 p-5">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-5">
           {/* GPX file */}
           <label className="flex flex-col items-center justify-center bg-black/[0.02] rounded-2xl px-4 py-6 border border-dashed border-black/10 cursor-pointer hover:border-black/20 transition-colors">
             <Upload size={20} className="text-black/25 mb-2" />
@@ -76,93 +76,110 @@ export const CourseUploadPage = observer(() => {
             <input type="file" accept=".gpx" className="hidden" onChange={handleFileChange} />
           </label>
           {store.gpxError && (
-            <p className="text-[12px] text-red-500 -mt-3">{store.gpxError}</p>
+            <p className="text-[12px] text-red-500 -mt-2">{store.gpxError}</p>
           )}
 
-          {/* Name */}
-          <div className="flex flex-col gap-2">
-            <label className="text-[13px] font-semibold text-black/50">
-              코스 이름 <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={store.name}
-              onChange={(e) => store.setName(e.target.value)}
-              placeholder="코스 이름을 입력하세요"
-              className="bg-black/[0.03] rounded-xl px-4 py-3 text-[15px] border border-black/[0.06] outline-none focus:border-black/20 transition-colors placeholder:text-black/25"
-            />
-          </div>
-
-          {/* Description */}
-          <div className="flex flex-col gap-2">
-            <label className="text-[13px] font-semibold text-black/50">설명</label>
-            <textarea
-              value={store.description}
-              onChange={(e) => store.setDescription(e.target.value)}
-              placeholder="코스 설명을 입력하세요 (선택)"
-              rows={3}
-              className="bg-black/[0.03] rounded-xl px-4 py-3 text-[15px] border border-black/[0.06] outline-none focus:border-black/20 transition-colors resize-none placeholder:text-black/25"
-            />
-          </div>
-
-          {/* Difficulty tags */}
-          <div className="flex flex-col gap-2">
-            <label className="text-[13px] font-semibold text-black/50">난이도</label>
-            <div className="flex gap-2">
-              {DIFFICULTY_TAGS.map((tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => store.tags.includes(tag) ? store.removeTag(tag) : store.addTag(tag)}
-                  className={`px-4 py-2 rounded-full text-[13px] font-semibold transition-all ${
-                    store.tags.includes(tag)
-                      ? 'bg-black text-white'
-                      : 'bg-black/[0.04] text-black/40'
-                  }`}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Terrain tags */}
-          <div className="flex flex-col gap-2">
-            <label className="text-[13px] font-semibold text-black/50">지형</label>
-            <div className="flex gap-2 flex-wrap">
-              {TERRAIN_TAGS.map((tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => store.tags.includes(tag) ? store.removeTag(tag) : store.addTag(tag)}
-                  className={`px-4 py-2 rounded-full text-[13px] font-semibold transition-all ${
-                    store.tags.includes(tag)
-                      ? 'bg-black text-white'
-                      : 'bg-black/[0.04] text-black/40'
-                  }`}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Public toggle */}
-          <div className="flex items-center justify-between py-1">
-            <div>
-              <p className="text-[14px] font-medium text-black/80">공개 코스</p>
-              <p className="text-[12px] text-black/35">공개하면 다른 사용자도 이 코스를 볼 수 있습니다</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => store.setIsPublic(!store.isPublic)}
-              className={`relative w-[46px] h-[26px] rounded-full transition-colors ${store.isPublic ? 'bg-black' : 'bg-black/15'}`}
-              aria-label="공개 여부 토글"
-            >
-              <span
-                className={`absolute top-[3px] w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${store.isPublic ? 'translate-x-[23px]' : 'translate-x-[3px]'}`}
+          {/* Main fields card */}
+          <div className="rounded-2xl border border-black/[0.06] overflow-hidden">
+            {/* Name */}
+            <div className="px-4 py-3.5 border-b border-black/[0.06]">
+              <label className="text-[11px] font-semibold text-black/35 uppercase tracking-wide">
+                코스 이름 <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="text"
+                value={store.name}
+                onChange={(e) => store.setName(e.target.value)}
+                placeholder="코스 이름을 입력하세요"
+                className="w-full mt-1 bg-transparent text-[15px] outline-none placeholder:text-black/20"
               />
-            </button>
+            </div>
+
+            {/* Region */}
+            <div className="px-4 py-3.5 border-b border-black/[0.06]">
+              <label className="text-[11px] font-semibold text-black/35 uppercase tracking-wide">위치</label>
+              <input
+                type="text"
+                value={store.region}
+                onChange={(e) => store.setRegion(e.target.value)}
+                placeholder="GPX 업로드 시 자동 입력"
+                className="w-full mt-1 bg-transparent text-[15px] outline-none placeholder:text-black/20"
+              />
+            </div>
+
+            {/* Description */}
+            <div className="px-4 py-3.5 border-b border-black/[0.06]">
+              <label className="text-[11px] font-semibold text-black/35 uppercase tracking-wide">설명</label>
+              <textarea
+                value={store.description}
+                onChange={(e) => store.setDescription(e.target.value)}
+                placeholder="코스 설명을 입력하세요 (선택)"
+                rows={2}
+                className="w-full mt-1 bg-transparent text-[15px] outline-none resize-none placeholder:text-black/20"
+              />
+            </div>
+
+            {/* Tags */}
+            <div className="px-4 py-3.5 border-b border-black/[0.06]">
+              <label className="text-[11px] font-semibold text-black/35 uppercase tracking-wide block mb-2.5">태그</label>
+              <div className="flex gap-2 flex-wrap">
+                {[...DIFFICULTY_TAGS, ...TERRAIN_TAGS].map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => store.tags.includes(tag) ? store.removeTag(tag) : store.addTag(tag)}
+                    className={`px-2.5 py-[3px] rounded-full text-[12px] font-medium transition-all ${
+                      store.tags.includes(tag)
+                        ? 'bg-black text-white'
+                        : 'bg-black/[0.05] text-black/35'
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Public toggle */}
+            <div className="px-4 py-3.5 flex items-center justify-between">
+              <div>
+                <p className="text-[15px] font-medium text-black/80">공개 코스</p>
+                <p className="text-[12px] text-black/35 mt-0.5">다른 사용자도 이 코스를 볼 수 있습니다</p>
+              </div>
+              {/* 래퍼 div로 크기 고정 — button이 flex에서 늘어나는 문제 방지 */}
+              <div style={{ width: 46, height: 26, flexShrink: 0, position: 'relative' }}>
+                <button
+                  type="button"
+                  onClick={() => store.setIsPublic(!store.isPublic)}
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    borderRadius: 13,
+                    backgroundColor: store.isPublic ? '#000000' : 'rgba(0,0,0,0.15)',
+                    transition: 'background-color 0.2s',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                  aria-label="공개 여부 토글"
+                >
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: 3,
+                      left: 3,
+                      width: 20,
+                      height: 20,
+                      borderRadius: '50%',
+                      backgroundColor: 'white',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                      transform: store.isPublic ? 'translateX(20px)' : 'translateX(0)',
+                      transition: 'transform 0.2s',
+                      display: 'block',
+                    }}
+                  />
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Submit */}

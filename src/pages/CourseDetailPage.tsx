@@ -16,7 +16,9 @@ export const CourseDetailPage = observer(() => {
   const [store] = useState(() => new CourseDetailStore(id!));
   const [mapStore] = useState(() => new MapStore());
   const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<naver.maps.Map | null>(null);
   const [gpxText, setGpxText] = useState<string | null | undefined>(undefined);
+  const elevationMarkerRef = useRef<naver.maps.Marker | null>(null);
 
   useEffect(() => {
     store.fetch();
@@ -51,9 +53,16 @@ export const CourseDetailPage = observer(() => {
     if (!mapRef.current || gpxText === undefined || store.loading) return;
 
     mapStore.initMap(mapRef.current);
-    if (gpxText) mapStore.drawGpxRoute(gpxText);
+    mapInstanceRef.current = mapStore.map;
+    if (gpxText) {
+      mapStore.drawGpxRoute(gpxText);
+      mapStore.returnToCourse();
+    }
 
-    return () => mapStore.destroy();
+    return () => {
+      mapStore.destroy();
+      mapInstanceRef.current = null;
+    };
   }, [mapStore, gpxText, store.loading]);
 
   const handleLike = async () => {
@@ -111,7 +120,7 @@ export const CourseDetailPage = observer(() => {
 
       {/* Scrollable detail */}
       <div
-        className="absolute inset-x-0 overflow-y-auto bg-white rounded-t-3xl -mt-4"
+        className="absolute inset-x-0 overflow-y-auto bg-white"
         style={{ top: MAP_HEIGHT, bottom: 0 }}
       >
         {/* Title + stats */}
@@ -147,7 +156,30 @@ export const CourseDetailPage = observer(() => {
 
         {typeof gpxText === 'string' && (
           <div className="border-t border-black/[0.04]">
-            <ElevationChart gpxText={gpxText} />
+            <ElevationChart
+              gpxText={gpxText}
+              onActiveCoord={(coord) => {
+                const map = mapInstanceRef.current;
+                if (!coord || !map) {
+                  elevationMarkerRef.current?.setMap(null);
+                  elevationMarkerRef.current = null;
+                  return;
+                }
+                const pos = new window.naver.maps.LatLng(coord.lat, coord.lon);
+                if (elevationMarkerRef.current) {
+                  elevationMarkerRef.current.setPosition(pos);
+                } else {
+                  elevationMarkerRef.current = new window.naver.maps.Marker({
+                    map,
+                    position: pos,
+                    icon: {
+                      content: '<div style="width:16px;height:16px;border-radius:50%;background:#FF5722;border:2.5px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.5);"></div>',
+                      anchor: new window.naver.maps.Point(8, 8),
+                    },
+                  });
+                }
+              }}
+            />
           </div>
         )}
 

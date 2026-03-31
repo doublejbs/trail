@@ -16,7 +16,7 @@ const TABS: Tab[] = [
   },
   {
     path: '/course',
-    label: '탐색',
+    label: '코스',
     icon: (a) => <Compass size={22} strokeWidth={a ? 2.2 : 1.6} />,
   },
   {

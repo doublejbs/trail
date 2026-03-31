@@ -23,6 +23,9 @@ const COURSE: Course = {
   thumbnail_path: null,
   distance_m: 8500,
   elevation_gain_m: 450,
+  region: null,
+  start_lat: null,
+  start_lng: null,
   is_public: true,
   created_at: '2026-01-01T00:00:00Z',
 };

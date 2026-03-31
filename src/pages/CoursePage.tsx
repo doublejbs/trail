@@ -1,10 +1,11 @@
 // src/pages/CoursePage.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
-import { Plus } from 'lucide-react';
+import { Plus, Search, Map } from 'lucide-react';
 import { CourseStore } from '../stores/CourseStore';
 import { CourseCard } from '../components/CourseCard';
+import { CourseMapView } from '../components/CourseMapView';
 import { LargeTitle } from '../components/LargeTitle';
 
 const FILTERS = [
@@ -15,6 +16,8 @@ const FILTERS = [
 export const CoursePage = observer(() => {
   const navigate = useNavigate();
   const [store] = useState(() => new CourseStore());
+  const [mapOpen, setMapOpen] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     store.fetchPage();
@@ -25,9 +28,30 @@ export const CoursePage = observer(() => {
     store.fetchPage();
   };
 
+  const handleSearch = (q: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      store.setQuery(q);
+      void store.fetchPage();
+    }, 300);
+  };
+
   return (
     <div className="relative flex flex-col h-full bg-white">
-      <LargeTitle title="탐색" />
+      <LargeTitle title="코스" />
+
+      {/* Search */}
+      <div className="px-5 pb-3">
+        <div className="flex items-center gap-2 bg-black/[0.04] rounded-xl px-3 py-2.5">
+          <Search size={15} className="text-black/30 shrink-0" />
+          <input
+            type="text"
+            placeholder="코스 검색"
+            onChange={(e) => handleSearch(e.target.value)}
+            className="flex-1 bg-transparent text-[14px] outline-none placeholder:text-black/30"
+          />
+        </div>
+      </div>
 
       {/* Filter chips */}
       <div className="flex gap-1.5 px-5 pb-1.5">
@@ -89,6 +113,25 @@ export const CoursePage = observer(() => {
           <Plus size={24} strokeWidth={2.2} />
         </button>
       </div>
+
+      {/* 지도 버튼 */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
+        <button
+          onClick={() => setMapOpen(true)}
+          aria-label="지도 보기"
+          className="flex items-center gap-2 px-5 py-3 bg-black text-white rounded-full text-[14px] font-semibold shadow-lg shadow-black/20 active:scale-95 transition-transform"
+        >
+          <Map size={16} />
+          지도
+        </button>
+      </div>
+
+      {mapOpen && (
+        <CourseMapView
+          courses={store.courses}
+          onClose={() => setMapOpen(false)}
+        />
+      )}
     </div>
   );
 });
