@@ -22,6 +22,7 @@ export function NavigationBar({ title, onBack, overlay = false, rightAction }: N
     >
       <button
         onClick={onBack}
+        aria-label="뒤로"
         className="flex items-center gap-0 text-sm font-semibold text-black/70 min-h-0 min-w-0 active:text-black/40 transition-colors"
       >
         <ChevronLeft size={22} strokeWidth={2} />

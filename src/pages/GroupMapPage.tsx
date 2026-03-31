@@ -170,7 +170,7 @@ export const GroupMapPage = observer(() => {
 
       {/* Side action buttons */}
       {mapStore.map && (
-        <div className={`absolute right-4 ${bottomOffset} z-10 flex flex-col gap-2`}>
+        <div className={`absolute right-4 ${bottomOffset} z-[102] flex flex-col gap-2`}>
           <Button
             variant="secondary"
             size="icon"
@@ -194,10 +194,21 @@ export const GroupMapPage = observer(() => {
         </div>
       )}
 
-      {/* Admin period controls — same position as tracking start button */}
-      {isAdmin && (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">
-          {!store.isPeriodActive ? (
+      {/* Bottom center buttons */}
+      {activeTab === 'map' && (
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2">
+          {/* Tracking start button — visible to everyone when period is active and not tracking */}
+          {store.isPeriodActive && !trackingStore.isTracking && !trackingStore.saving && !trackingStore.restoring && (
+            <button
+              onClick={() => void trackingStore.start()}
+              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); void trackingStore.start(); }}
+              className="px-10 py-3.5 rounded-full text-[15px] font-bold shadow-lg transition-transform bg-black text-white shadow-black/25 active:scale-95"
+            >
+              시작
+            </button>
+          )}
+          {/* Admin period controls */}
+          {isAdmin && !store.isPeriodActive && (
             <button
               onClick={() => void store.startPeriod()}
               onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); void store.startPeriod(); }}
@@ -205,7 +216,8 @@ export const GroupMapPage = observer(() => {
             >
               활동 시작
             </button>
-          ) : (
+          )}
+          {isAdmin && store.isPeriodActive && !trackingStore.isTracking && !trackingStore.saving && (
             <button
               onClick={() => void store.endPeriod()}
               onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); void store.endPeriod(); }}
@@ -217,30 +229,19 @@ export const GroupMapPage = observer(() => {
         </div>
       )}
 
-      {/* Tracking start button */}
-      {!isAdmin && !trackingStore.isTracking && !trackingStore.saving && !trackingStore.restoring && activeTab === 'map' && (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2">
-          <button
-            disabled={!store.isPeriodActive}
-            onClick={() => void trackingStore.start()}
-            onTouchEnd={(e) => { if (!store.isPeriodActive) return; e.preventDefault(); e.stopPropagation(); void trackingStore.start(); }}
-            className={`px-10 py-3.5 rounded-full text-[15px] font-bold shadow-lg transition-transform ${
-              store.isPeriodActive
-                ? 'bg-black text-white shadow-black/25 active:scale-95'
-                : 'bg-neutral-300 text-white shadow-black/10 cursor-not-allowed'
-            }`}
-          >
-            시작
-          </button>
-          {!store.isPeriodActive && (
-            <p className="text-[12px] font-medium text-black/70 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm whitespace-nowrap">관리자가 활동을 시작하면 시작할 수 있습니다</p>
-          )}
-        </div>
-      )}
-
       {/* Tracking panel */}
       {(trackingStore.isTracking || trackingStore.saving) && (
-        <div className="absolute bottom-6 left-4 right-4 z-10 bg-white rounded-2xl shadow-xl shadow-black/10 border border-black/[0.06] px-5 py-4">
+        <div className="absolute bottom-6 left-4 right-4 z-[101] flex flex-col items-center gap-2">
+          {isAdmin && store.isPeriodActive && (
+            <button
+              onClick={() => void store.endPeriod()}
+              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); void store.endPeriod(); }}
+              className="bg-white text-black/60 px-10 py-3.5 rounded-full text-[15px] font-bold shadow-lg shadow-black/10 border border-black/[0.06] active:scale-95 transition-transform"
+            >
+              활동 종료
+            </button>
+          )}
+        <div className="w-full bg-white rounded-2xl shadow-xl shadow-black/10 border border-black/[0.06] px-5 py-4">
           <div className="flex justify-around text-center mb-3">
             <div>
               <p className="text-[20px] font-bold tabular-nums text-black">{trackingStore.formattedTime}</p>
@@ -289,11 +290,12 @@ export const GroupMapPage = observer(() => {
             </div>
           )}
         </div>
+        </div>
       )}
 
       {/* Leaderboard panel */}
       {activeTab === 'leaderboard' && (
-        <div data-testid="leaderboard-panel" className="absolute bottom-6 left-4 right-4 top-20 z-10 bg-white rounded-2xl shadow-xl shadow-black/10 border border-black/[0.06] overflow-hidden flex flex-col">
+        <div data-testid="leaderboard-panel" className="absolute bottom-6 left-4 right-4 top-20 z-[103] bg-white rounded-2xl shadow-xl shadow-black/10 border border-black/[0.06] overflow-hidden flex flex-col">
           {/* Header */}
           <div className="flex items-center px-4 h-12 border-b border-black/[0.06] shrink-0">
             <span className="flex-1 text-[15px] font-bold text-black">순위</span>
