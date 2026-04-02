@@ -18,7 +18,8 @@ class TrackingStore {
 
   public displayName: string | null = null;
   private timerId: ReturnType<typeof setInterval> | null = null;
-  private _broadcastTimerId: ReturnType<typeof setInterval> | null = null;
+  private _lastBroadcastLat: number | null = null;
+  private _lastBroadcastLng: number | null = null;
   private _positionSaveCounter: number = 0;
   private _userId: string | null = null;
   private _channel: ReturnType<typeof supabase.channel> | null = null;
@@ -193,7 +194,6 @@ class TrackingStore {
 
   public dispose(): void {
     this._clearTimer();
-    this._clearBroadcastTimer();
     if (this._channel) {
       void supabase.removeChannel(this._channel);
       runInAction(() => { this._channel = null; });
@@ -203,6 +203,7 @@ class TrackingStore {
   public setLatestPosition(lat: number, lng: number): void {
     this.latestLat = lat;
     this.latestLng = lng;
+    this._maybeBroadcast(lat, lng);
   }
 
   public async startLocationBroadcast(): Promise<void> {
@@ -217,51 +218,54 @@ class TrackingStore {
         .single();
 
       const channel = supabase.channel(`group-progress:${this.groupId}`);
-      channel.subscribe((status) => {
-        console.log('[TrackingStore] broadcast channel status:', status);
-      });
+      channel.subscribe();
 
       runInAction(() => {
         this._userId = user.id;
         this.displayName = profile?.display_name ?? user.email?.split('@')[0] ?? null;
         this._channel = channel;
       });
-    } catch (e) {
-      console.error('[TrackingStore] startLocationBroadcast error:', e);
-      return;
+    } catch {
+      // silent
+    }
+  }
+
+  private _maybeBroadcast(lat: number, lng: number): void {
+    if (!this._channel || !this._userId) return;
+
+    const MIN_DISTANCE_M = 5;
+    if (this._lastBroadcastLat !== null && this._lastBroadcastLng !== null) {
+      const dist = haversineMeters(this._lastBroadcastLat, this._lastBroadcastLng, lat, lng);
+      if (dist < MIN_DISTANCE_M) return;
     }
 
-    this._clearBroadcastTimer();
-    this._positionSaveCounter = 0;
-    this._broadcastTimerId = setInterval(() => {
-      if (this._channel && this._userId) {
-        console.log('[TrackingStore] sending broadcast', { lat: this.latestLat, lng: this.latestLng });
-        void this._channel.send({
-          type: 'broadcast',
-          event: 'progress',
-          payload: {
-            userId: this._userId,
-            displayName: this.displayName,
-            maxRouteMeters: this.maxRouteMeters,
-            lat: this.latestLat,
-            lng: this.latestLng,
-          },
-        });
+    this._lastBroadcastLat = lat;
+    this._lastBroadcastLng = lng;
 
-        // 5초마다 DB에 마지막 위치 저장
-        this._positionSaveCounter += 1;
-        if (this._positionSaveCounter >= 5 && this.latestLat !== null && this.latestLng !== null) {
-          this._positionSaveCounter = 0;
-          void supabase.from('group_member_positions').upsert({
-            user_id: this._userId,
-            group_id: this.groupId,
-            lat: this.latestLat,
-            lng: this.latestLng,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'user_id,group_id' });
-        }
-      }
-    }, 1000);
+    void this._channel.send({
+      type: 'broadcast',
+      event: 'progress',
+      payload: {
+        userId: this._userId,
+        displayName: this.displayName,
+        maxRouteMeters: this.maxRouteMeters,
+        lat,
+        lng,
+      },
+    });
+
+    // 5번 브로드캐스트마다 DB 저장
+    this._positionSaveCounter += 1;
+    if (this._positionSaveCounter >= 5) {
+      this._positionSaveCounter = 0;
+      void supabase.from('group_member_positions').upsert({
+        user_id: this._userId,
+        group_id: this.groupId,
+        lat,
+        lng,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id,group_id' });
+    }
   }
 
   public addPoint(lat: number, lng: number): void {
@@ -296,12 +300,6 @@ class TrackingStore {
     }
   }
 
-  private _clearBroadcastTimer(): void {
-    if (this._broadcastTimerId !== null) {
-      clearInterval(this._broadcastTimerId);
-      this._broadcastTimerId = null;
-    }
-  }
 }
 
 export { TrackingStore };
