@@ -163,6 +163,7 @@ export const GroupMapPage = observer(() => {
       isLive: true,
       lat: trackingStore.latestLat,
       lng: trackingStore.latestLng,
+      avatarUrl: null,
     };
     return [...leaderboardStore.rankings, myEntry].sort((a, b) => b.maxRouteMeters - a.maxRouteMeters);
   })();

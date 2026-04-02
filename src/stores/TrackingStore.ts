@@ -214,19 +214,26 @@ class TrackingStore {
         .select('display_name')
         .eq('id', user.id)
         .single();
+
+      const channel = supabase.channel(`group-progress:${this.groupId}`);
+      channel.subscribe((status) => {
+        console.log('[TrackingStore] broadcast channel status:', status);
+      });
+
       runInAction(() => {
         this._userId = user.id;
         this.displayName = profile?.display_name ?? user.email?.split('@')[0] ?? null;
-        this._channel = supabase.channel(`group-progress:${this.groupId}`);
-        this._channel.subscribe();
+        this._channel = channel;
       });
-    } catch {
+    } catch (e) {
+      console.error('[TrackingStore] startLocationBroadcast error:', e);
       return;
     }
 
     this._clearBroadcastTimer();
     this._broadcastTimerId = setInterval(() => {
       if (this._channel && this._userId) {
+        console.log('[TrackingStore] sending broadcast', { lat: this.latestLat, lng: this.latestLng });
         void this._channel.send({
           type: 'broadcast',
           event: 'progress',
