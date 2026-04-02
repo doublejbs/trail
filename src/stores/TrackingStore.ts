@@ -243,20 +243,16 @@ class TrackingStore {
       return;
     }
 
-    console.log('[TrackingStore] position save timer 시작');
     runInAction(() => {
       this._positionSaveTimerId = setInterval(() => {
         if (this._userId && this.latestLat !== null && this.latestLng !== null) {
-          supabase.from('group_member_positions').upsert({
+          void supabase.from('group_member_positions').upsert({
             user_id: this._userId!,
             group_id: this.groupId,
             lat: this.latestLat!,
             lng: this.latestLng!,
             updated_at: new Date().toISOString(),
-          }, { onConflict: 'user_id,group_id' }).then(({ error }) => {
-            if (error) console.error('[TrackingStore] position upsert error:', error);
-            else console.log('[TrackingStore] position saved');
-          });
+          }, { onConflict: 'user_id,group_id' });
         }
       }, 5000);
     });
