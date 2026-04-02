@@ -19,6 +19,7 @@ class TrackingStore {
   public displayName: string | null = null;
   private timerId: ReturnType<typeof setInterval> | null = null;
   private _broadcastTimerId: ReturnType<typeof setInterval> | null = null;
+  private _positionSaveCounter: number = 0;
   private _userId: string | null = null;
   private _channel: ReturnType<typeof supabase.channel> | null = null;
   private _sessionId: string | null = null;
@@ -231,6 +232,7 @@ class TrackingStore {
     }
 
     this._clearBroadcastTimer();
+    this._positionSaveCounter = 0;
     this._broadcastTimerId = setInterval(() => {
       if (this._channel && this._userId) {
         console.log('[TrackingStore] sending broadcast', { lat: this.latestLat, lng: this.latestLng });
@@ -245,6 +247,19 @@ class TrackingStore {
             lng: this.latestLng,
           },
         });
+
+        // 5초마다 DB에 마지막 위치 저장
+        this._positionSaveCounter += 1;
+        if (this._positionSaveCounter >= 5 && this.latestLat !== null && this.latestLng !== null) {
+          this._positionSaveCounter = 0;
+          void supabase.from('group_member_positions').upsert({
+            user_id: this._userId,
+            group_id: this.groupId,
+            lat: this.latestLat,
+            lng: this.latestLng,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'user_id,group_id' });
+        }
       }
     }, 1000);
   }

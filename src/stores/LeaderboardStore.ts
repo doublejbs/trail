@@ -69,6 +69,18 @@ class LeaderboardStore {
         }));
       }
 
+      const positionMap = new Map<string, { lat: number; lng: number }>();
+      if (userIds.length > 0) {
+        const { data: positions } = await supabase
+          .from('group_member_positions')
+          .select('user_id, lat, lng')
+          .eq('group_id', this.groupId)
+          .in('user_id', userIds);
+        for (const p of positions ?? []) {
+          positionMap.set(p.user_id, { lat: p.lat, lng: p.lng });
+        }
+      }
+
       runInAction(() => {
         this.rankings = [...maxByUser.entries()]
           .map(([userId, maxRouteMeters]) => ({
@@ -76,8 +88,8 @@ class LeaderboardStore {
             displayName: nameMap.get(userId) ?? '알 수 없음',
             maxRouteMeters,
             isLive: false,
-            lat: null,
-            lng: null,
+            lat: positionMap.get(userId)?.lat ?? null,
+            lng: positionMap.get(userId)?.lng ?? null,
             avatarUrl: avatarUrlMap.get(userId) ?? null,
           }))
           .sort((a, b) => b.maxRouteMeters - a.maxRouteMeters);
