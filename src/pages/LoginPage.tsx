@@ -31,13 +31,24 @@ export const LoginPage = observer(() => {
     <div className="flex min-h-screen flex-col items-center justify-center bg-white px-6">
       {/* Brand */}
       <div className="mb-10 text-center anim-fade-up">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-black mb-5">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M4 18L8 10L12 14L16 6L20 12" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </div>
-        <h1 className="text-[28px] font-extrabold tracking-tight text-black">Trail</h1>
-        <p className="text-[14px] text-black/40 mt-1.5 font-medium">등산 위치 공유 서비스</p>
+        <svg width="52" height="67" viewBox="0 0 40 52" fill="none" aria-hidden="true" className="mb-5 drop-shadow-sm block mx-auto">
+          <ellipse cx="20" cy="50.5" rx="5.5" ry="1.5" fill="black" opacity="0.12"/>
+          <path d="M20 50 C16 43,0 33,0 20 A20 20 0 1 1 40 20 C40 33,24 43,20 50Z" fill="#0D0D0D"/>
+          <text
+            x="20" y="20"
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontFamily="Impact, 'Arial Narrow', sans-serif"
+            fontSize="11"
+            fontWeight="900"
+            fontStyle="italic"
+            fill="white"
+            letterSpacing="0.5"
+            transform="rotate(-14, 20, 20)"
+          >WPT</text>
+        </svg>
+        <h1 className="text-[28px] font-extrabold tracking-tight text-black">waypoint</h1>
+        <p className="text-[14px] text-black/40 mt-1.5 font-medium">같은 경로를, 함께</p>
       </div>
 
       {/* Buttons */}
