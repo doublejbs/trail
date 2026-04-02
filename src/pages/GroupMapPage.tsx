@@ -4,7 +4,8 @@ import { observer } from 'mobx-react-lite';
 import { NavigationBar } from '../components/NavigationBar';
 import { runInAction, autorun, reaction } from 'mobx';
 import { Button } from '@/components/ui/button';
-import { Crosshair, Trophy, X, Settings } from 'lucide-react';
+import { Crosshair, Trophy, X, Settings, TrendingUp } from 'lucide-react';
+import { ElevationChart } from '../components/ElevationChart';
 import { MapStore } from '../stores/MapStore';
 import { GroupMapStore } from '../stores/GroupMapStore';
 import { TrackingStore } from '../stores/TrackingStore';
@@ -21,6 +22,7 @@ export const GroupMapPage = observer(() => {
   const [trackingStore] = useState(() => new TrackingStore(id!, []));
   const [leaderboardStore] = useState(() => new LeaderboardStore(id!));
   const [activeTab, setActiveTab] = useState<'map' | 'leaderboard'>('map');
+  const [showElevation, setShowElevation] = useState(false);
 
   const routePoints = useMemo(
     () => (store.gpxText ? parseGpxPoints(store.gpxText) : []),
@@ -113,7 +115,11 @@ export const GroupMapPage = observer(() => {
   }
 
   const isAdmin = store.currentUserId === store.group.created_by;
-  const bottomOffset = (trackingStore.isTracking || trackingStore.saving) ? 'bottom-44' : 'bottom-24';
+  const isTrackingActive = trackingStore.isTracking || trackingStore.saving;
+  // 고도 시트 높이 220px. 시트가 열리면 버튼/패널을 위로 밀어올림
+  const sideButtonsBottom = showElevation ? 236 : isTrackingActive ? 176 : 96;
+  const trackingPanelBottom = showElevation ? 228 : 24;
+  const bottomCenterBottom = showElevation ? 228 : 32;
 
   const displayRankings = (() => {
     if (!trackingStore.isTracking || !store.currentUserId) return leaderboardStore.rankings;
@@ -170,7 +176,10 @@ export const GroupMapPage = observer(() => {
 
       {/* Side action buttons */}
       {mapStore.map && (
-        <div className={`absolute right-4 ${bottomOffset} z-10 flex flex-col gap-2`}>
+        <div
+          className="absolute right-4 z-[102] flex flex-col gap-2 transition-all duration-300"
+          style={{ bottom: sideButtonsBottom }}
+        >
           <Button
             variant="secondary"
             size="icon"
@@ -180,6 +189,16 @@ export const GroupMapPage = observer(() => {
             className={`rounded-xl shadow-lg shadow-black/10 border border-black/[0.06] ${activeTab === 'leaderboard' ? 'bg-black text-white hover:bg-black/90' : 'bg-white hover:bg-white'}`}
           >
             <Trophy size={18} className={activeTab === 'leaderboard' ? 'text-white' : 'text-black/60'} />
+          </Button>
+          <Button
+            variant="secondary"
+            size="icon"
+            onClick={() => { setShowElevation(!showElevation); setActiveTab('map'); }}
+            onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); setShowElevation(!showElevation); setActiveTab('map'); }}
+            aria-label="고도 프로파일"
+            className={`rounded-xl shadow-lg shadow-black/10 border border-black/[0.06] ${showElevation ? 'bg-black text-white hover:bg-black/90' : 'bg-white hover:bg-white'}`}
+          >
+            <TrendingUp size={18} className={showElevation ? 'text-white' : 'text-black/60'} />
           </Button>
           <Button
             variant="secondary"
@@ -194,10 +213,24 @@ export const GroupMapPage = observer(() => {
         </div>
       )}
 
-      {/* Admin period controls — same position as tracking start button */}
-      {isAdmin && (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">
-          {!store.isPeriodActive ? (
+      {/* Bottom center buttons */}
+      {activeTab === 'map' && (
+        <div
+          className="absolute left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2 transition-all duration-300"
+          style={{ bottom: bottomCenterBottom }}
+        >
+          {/* Tracking start button — visible to everyone when period is active and not tracking */}
+          {store.isPeriodActive && !trackingStore.isTracking && !trackingStore.saving && !trackingStore.restoring && (
+            <button
+              onClick={() => void trackingStore.start()}
+              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); void trackingStore.start(); }}
+              className="px-10 py-3.5 rounded-full text-[15px] font-bold shadow-lg transition-transform bg-black text-white shadow-black/25 active:scale-95"
+            >
+              시작
+            </button>
+          )}
+          {/* Admin period controls */}
+          {isAdmin && !store.isPeriodActive && (
             <button
               onClick={() => void store.startPeriod()}
               onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); void store.startPeriod(); }}
@@ -205,7 +238,8 @@ export const GroupMapPage = observer(() => {
             >
               활동 시작
             </button>
-          ) : (
+          )}
+          {isAdmin && store.isPeriodActive && !trackingStore.isTracking && !trackingStore.saving && (
             <button
               onClick={() => void store.endPeriod()}
               onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); void store.endPeriod(); }}
@@ -217,30 +251,22 @@ export const GroupMapPage = observer(() => {
         </div>
       )}
 
-      {/* Tracking start button */}
-      {!isAdmin && !trackingStore.isTracking && !trackingStore.saving && !trackingStore.restoring && activeTab === 'map' && (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2">
-          <button
-            disabled={!store.isPeriodActive}
-            onClick={() => void trackingStore.start()}
-            onTouchEnd={(e) => { if (!store.isPeriodActive) return; e.preventDefault(); e.stopPropagation(); void trackingStore.start(); }}
-            className={`px-10 py-3.5 rounded-full text-[15px] font-bold shadow-lg transition-transform ${
-              store.isPeriodActive
-                ? 'bg-black text-white shadow-black/25 active:scale-95'
-                : 'bg-neutral-300 text-white shadow-black/10 cursor-not-allowed'
-            }`}
-          >
-            시작
-          </button>
-          {!store.isPeriodActive && (
-            <p className="text-[12px] font-medium text-black/70 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm whitespace-nowrap">관리자가 활동을 시작하면 시작할 수 있습니다</p>
-          )}
-        </div>
-      )}
-
       {/* Tracking panel */}
-      {(trackingStore.isTracking || trackingStore.saving) && (
-        <div className="absolute bottom-6 left-4 right-4 z-10 bg-white rounded-2xl shadow-xl shadow-black/10 border border-black/[0.06] px-5 py-4">
+      {isTrackingActive && (
+        <div
+          className="absolute left-4 right-4 z-[101] flex flex-col items-center gap-2 transition-all duration-300"
+          style={{ bottom: trackingPanelBottom }}
+        >
+          {isAdmin && store.isPeriodActive && (
+            <button
+              onClick={() => void store.endPeriod()}
+              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); void store.endPeriod(); }}
+              className="bg-white text-black/60 px-10 py-3.5 rounded-full text-[15px] font-bold shadow-lg shadow-black/10 border border-black/[0.06] active:scale-95 transition-transform"
+            >
+              활동 종료
+            </button>
+          )}
+        <div className="w-full bg-white rounded-2xl shadow-xl shadow-black/10 border border-black/[0.06] px-5 py-4">
           <div className="flex justify-around text-center mb-3">
             <div>
               <p className="text-[20px] font-bold tabular-nums text-black">{trackingStore.formattedTime}</p>
@@ -289,11 +315,12 @@ export const GroupMapPage = observer(() => {
             </div>
           )}
         </div>
+        </div>
       )}
 
       {/* Leaderboard panel */}
       {activeTab === 'leaderboard' && (
-        <div data-testid="leaderboard-panel" className="absolute bottom-6 left-4 right-4 top-20 z-10 bg-white rounded-2xl shadow-xl shadow-black/10 border border-black/[0.06] overflow-hidden flex flex-col">
+        <div data-testid="leaderboard-panel" className="absolute bottom-6 left-4 right-4 top-20 z-[103] bg-white rounded-2xl shadow-xl shadow-black/10 border border-black/[0.06] overflow-hidden flex flex-col">
           {/* Header */}
           <div className="flex items-center px-4 h-12 border-b border-black/[0.06] shrink-0">
             <span className="flex-1 text-[15px] font-bold text-black">순위</span>
@@ -351,6 +378,29 @@ export const GroupMapPage = observer(() => {
               <p className="text-center text-[13px] text-black/30 py-8">아직 기록이 없습니다</p>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Elevation bottom sheet */}
+      {showElevation && store.gpxText && (
+        <div className="absolute bottom-0 left-0 right-0 z-[103] bg-white rounded-t-2xl shadow-[0_-4px_24px_rgba(0,0,0,0.10)]">
+          <div className="flex justify-center pt-2.5 pb-1">
+            <div className="w-9 h-1 bg-black/10 rounded-full" />
+          </div>
+          <div className="flex items-center px-4 pb-1">
+            <p className="flex-1 text-[14px] font-bold text-black">고도 프로파일</p>
+            <button
+              onClick={() => setShowElevation(false)}
+              className="w-7 h-7 flex items-center justify-center text-black/30 active:text-black/60"
+              aria-label="닫기"
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <ElevationChart
+            gpxText={store.gpxText}
+            currentDistanceKm={trackingStore.isTracking ? trackingStore.maxRouteMeters / 1000 : undefined}
+          />
         </div>
       )}
 

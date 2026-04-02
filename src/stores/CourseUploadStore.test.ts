@@ -109,6 +109,8 @@ describe('CourseUploadStore', () => {
         gpx_path: `${FAKE_UID}/${FAKE_COURSE_ID}.gpx`,
         distance_m: 150,
         elevation_gain_m: 10,
+        region: null,
+        thumbnail_path: null,
         is_public: true,
       });
     });

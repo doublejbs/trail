@@ -136,8 +136,14 @@ export function CourseCard({ course, likeCount, onClick }: Props) {
 
           {/* Stats row */}
           <div className="flex items-center gap-3 mt-1.5">
+            {course.region && (
+              <span className="flex items-center gap-1 text-[12px] text-black/40 font-medium">
+                <MapPin size={11} strokeWidth={2.5} />
+                {course.region}
+              </span>
+            )}
             <span className="flex items-center gap-1 text-[12px] text-black/40 font-medium">
-              <MapPin size={11} strokeWidth={2.5} />
+              {!course.region && <MapPin size={11} strokeWidth={2.5} />}
               {formatDistance(course.distance_m)}
             </span>
             {course.elevation_gain_m != null && (

@@ -71,10 +71,12 @@ const { mockTrackingStore } = vi.hoisted(() => ({
     formattedSpeed: '0.0km/h',
     saving: false,
     saveError: null as string | null,
+    restoring: false,
     start: vi.fn(),
     stop: vi.fn(),
     pause: vi.fn(),
     resume: vi.fn(),
+    restore: vi.fn(),
     addPoint: vi.fn(),
     dispose: vi.fn(),
     maxRouteMeters: 0,
@@ -133,6 +135,7 @@ describe('GroupMapPage', () => {
     mockTrackingStore.isTracking = false;
     mockTrackingStore.isPaused = false;
     mockTrackingStore.saving = false;
+    mockTrackingStore.restoring = false;
     mockTrackingStore.saveError = null;
     mockTrackingStore.formattedTime = '00:00:00';
     mockTrackingStore.formattedDistance = '0m';
@@ -214,30 +217,29 @@ describe('GroupMapPage', () => {
   });
 
   describe('트래킹 UI', () => {
-    it('트래킹 전 — 시작 버튼 표시', async () => {
+    it('트래킹 전 — 활동 기간 활성 시 시작 버튼 표시', async () => {
+      mockGroupMapStore.isPeriodActive = true;
       renderAt('/group/group-uuid-1');
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /● 시작/ })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /시작/ })).toBeInTheDocument();
       });
     });
 
     it('시작 버튼 클릭 시 trackingStore.start() 호출', async () => {
+      mockGroupMapStore.isPeriodActive = true;
       renderAt('/group/group-uuid-1');
-      await waitFor(() => screen.getByRole('button', { name: /● 시작/ }));
-      fireEvent.click(screen.getByRole('button', { name: /● 시작/ }));
+      await waitFor(() => screen.getByRole('button', { name: /시작/ }));
+      fireEvent.click(screen.getByRole('button', { name: /시작/ }));
       expect(mockTrackingStore.start).toHaveBeenCalledOnce();
     });
 
     it('트래킹 중 — 통계 패널 표시', async () => {
       mockTrackingStore.isTracking = true;
       mockTrackingStore.formattedTime = '00:01:23';
-      mockTrackingStore.formattedDistance = '250m';
-      mockTrackingStore.formattedSpeed = '3.5km/h';
       renderAt('/group/group-uuid-1');
       await waitFor(() => {
         expect(screen.getByText('00:01:23')).toBeInTheDocument();
-        expect(screen.getByText('250m')).toBeInTheDocument();
-        expect(screen.getByText('3.5km/h')).toBeInTheDocument();
+        expect(screen.getByText('경과 시간')).toBeInTheDocument();
       });
     });
 
@@ -260,11 +262,12 @@ describe('GroupMapPage', () => {
     });
 
     it('트래킹 중 — 시작 버튼 미표시', async () => {
+      mockGroupMapStore.isPeriodActive = true;
       mockTrackingStore.isTracking = true;
       mockTrackingStore.isPaused = false;
       renderAt('/group/group-uuid-1');
       await waitFor(() => screen.getByRole('button', { name: /일시정지/ }));
-      expect(screen.queryByRole('button', { name: /시작/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^시작$/ })).not.toBeInTheDocument();
     });
 
     it('saving 중 통계 패널 유지', async () => {
