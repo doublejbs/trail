@@ -11,6 +11,7 @@ import { GroupMapStore } from '../stores/GroupMapStore';
 import { TrackingStore } from '../stores/TrackingStore';
 import { LeaderboardStore } from '../stores/LeaderboardStore';
 import { parseGpxPoints, totalRouteDistance } from '../utils/routeProjection';
+import { parseGpxCoords } from '../lib/gpx';
 import type { Ranking } from '../stores/LeaderboardStore';
 
 export const GroupMapPage = observer(() => {
@@ -39,19 +40,25 @@ export const GroupMapPage = observer(() => {
     return store.load(id);
   }, [store, id]);
 
+  // 지도 초기화 — 그룹 데이터 로드 즉시
   useEffect(() => {
-    if (!mapRef.current || store.gpxText === undefined || store.group === undefined || store.group === null) {
-      return () => { mapStore.destroy(); };
-    }
+    if (!mapRef.current || !store.group) return;
     mapStore.initMap(mapRef.current);
     mapStore.startWatchingLocation((lat, lng) => trackingStore.addPoint(lat, lng));
-    if (store.gpxText !== null) {
-      mapStore.drawGpxRoute(store.gpxText);
-    } else {
-      runInAction(() => { mapStore.error = true; });
-    }
     return () => { mapStore.destroy(); };
-  }, [mapStore, trackingStore, store.gpxText, store.group]);
+  }, [mapStore, trackingStore, store.group]);
+
+  // 경로 그리기 — GPX 로드 시 첫 좌표로 center 이동 후 경로 표시
+  useEffect(() => {
+    if (store.gpxText === undefined || !mapStore.map) return;
+    if (store.gpxText === null) {
+      runInAction(() => { mapStore.error = true; });
+      return;
+    }
+    const firstCoord = parseGpxCoords(store.gpxText)?.[0];
+    if (firstCoord) mapStore.map.setCenter(new window.naver.maps.LatLng(firstCoord.lat, firstCoord.lon));
+    mapStore.drawGpxRoute(store.gpxText);
+  }, [mapStore, store.gpxText]);
 
   useEffect(() => {
     if (routePoints.length > 0) trackingStore.setRoutePoints(routePoints);
@@ -103,7 +110,7 @@ export const GroupMapPage = observer(() => {
 
   if (store.group === null) return <Navigate to="/group" replace />;
 
-  if (store.group === undefined || store.gpxText === undefined) {
+  if (store.group === undefined) {
     return (
       <div className="absolute inset-0 flex items-center justify-center bg-white">
         <div
@@ -147,13 +154,56 @@ export const GroupMapPage = observer(() => {
   };
 
   return (
-    <div className="absolute inset-0">
+    <div className="absolute inset-0 flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      <NavigationBar
+        title={store.group.name}
+        onBack={() => navigate(-1)}
+        rightAction={
+          store.currentUserId && store.group && store.currentUserId === store.group.created_by ? (
+            <button
+              onClick={() => navigate(`/group/${id}/settings`)}
+              aria-label="설정"
+              className="min-h-0 min-w-0 text-black/50 active:text-black/30"
+            >
+              <Settings size={20} />
+            </button>
+          ) : undefined
+        }
+      />
+
+      <div className="flex-1 relative overflow-hidden">
       {/* Map container */}
       <div
         ref={mapRef}
         data-testid="map-container"
         className="absolute inset-0 w-full h-full"
       />
+
+      {/* GPX 로딩 중 shimmer + pulse — 경로 그려질 때까지 유지 */}
+      {!mapStore.gpxPolyline && !mapStore.error && (
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div
+            className="absolute inset-0"
+            style={{
+              background: 'linear-gradient(108deg, transparent 30%, rgba(255,255,255,0.45) 50%, transparent 70%)',
+              animation: 'shimmer 2.2s ease-in-out infinite',
+            }}
+          />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="relative flex items-center justify-center">
+              <div
+                className="absolute w-20 h-20 rounded-full border border-black/20"
+                style={{ animation: 'ping 1.8s cubic-bezier(0,0,0.2,1) infinite' }}
+              />
+              <div
+                className="absolute w-10 h-10 rounded-full border border-black/25"
+                style={{ animation: 'ping 1.8s cubic-bezier(0,0,0.2,1) 0.4s infinite' }}
+              />
+              <div className="w-2.5 h-2.5 rounded-full bg-black/40" />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Error overlay */}
       {mapStore.error && (
@@ -164,7 +214,7 @@ export const GroupMapPage = observer(() => {
 
       {/* Return to course */}
       {mapStore.map && !mapStore.isCourseVisible && (
-        <div className="absolute top-[56px] right-4 z-20">
+        <div className="absolute top-4 right-4 z-20">
           <button
             onClick={() => mapStore.returnToCourse()}
             className="bg-white text-black px-4 py-2 rounded-full text-[12px] font-bold shadow-lg shadow-black/10 whitespace-nowrap border border-black/[0.06]"
@@ -320,7 +370,7 @@ export const GroupMapPage = observer(() => {
 
       {/* Leaderboard panel */}
       {activeTab === 'leaderboard' && (
-        <div data-testid="leaderboard-panel" className="absolute bottom-6 left-4 right-4 top-20 z-[103] bg-white rounded-2xl shadow-xl shadow-black/10 border border-black/[0.06] overflow-hidden flex flex-col">
+        <div data-testid="leaderboard-panel" className="absolute bottom-6 left-4 right-4 top-4 z-[103] bg-white rounded-2xl shadow-xl shadow-black/10 border border-black/[0.06] overflow-hidden flex flex-col">
           {/* Header */}
           <div className="flex items-center px-4 h-12 border-b border-black/[0.06] shrink-0">
             <span className="flex-1 text-[15px] font-bold text-black">순위</span>
@@ -404,22 +454,7 @@ export const GroupMapPage = observer(() => {
         </div>
       )}
 
-      <NavigationBar
-        title={store.group.name}
-        onBack={() => navigate(-1)}
-        overlay
-        rightAction={
-          store.currentUserId && store.group && store.currentUserId === store.group.created_by ? (
-            <button
-              onClick={() => navigate(`/group/${id}/settings`)}
-              aria-label="설정"
-              className="min-h-0 min-w-0 text-black/50 active:text-black/30"
-            >
-              <Settings size={20} />
-            </button>
-          ) : undefined
-        }
-      />
+      </div>
     </div>
   );
 });

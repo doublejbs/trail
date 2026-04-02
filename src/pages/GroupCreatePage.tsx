@@ -35,7 +35,7 @@ export const GroupCreatePage = observer(() => {
     }
   }, [mapStore, mapReady, gpxText]);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0] ?? null;
     if (!f) return;
     store.setFile(f);

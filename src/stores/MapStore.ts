@@ -19,6 +19,7 @@ class MapStore {
   private watchId: number | null = null;
   private lastPosition: { latitude: number; longitude: number } | null = null;
   private _memberMarkers: Map<string, naver.maps.Marker> = new Map();
+  private _logoEl: HTMLDivElement | null = null;
 
   public constructor() {
     makeAutoObservable(this, {
@@ -30,7 +31,7 @@ class MapStore {
     });
   }
 
-  public initMap(el: HTMLDivElement): void {
+  public initMap(el: HTMLDivElement, center?: { lat: number; lng: number }): void {
     if (this.map) return;
 
     const clientId = import.meta.env.VITE_NAVER_MAP_CLIENT_ID;
@@ -55,10 +56,42 @@ class MapStore {
 
     try {
       const instance = new window.naver.maps.Map(el, {
-        center: new window.naver.maps.LatLng(37.5665, 126.978),
+        center: new window.naver.maps.LatLng(
+          center?.lat ?? 37.5665,
+          center?.lng ?? 126.978,
+        ),
         zoom: 14,
+        logoControl: false,
       });
       this.map = instance;
+
+      // Naver Maps 기본 로고를 CSS로 강제 숨김
+      // logoControl: false 옵션이 적용 안 될 경우 대비
+      const hideStyle = document.createElement('style');
+      hideStyle.setAttribute('data-map-logo-hide', '');
+      hideStyle.textContent = `
+        a[href*="ssl.pstatic.net/static/maps/mantle/notice/legal.html"] { display: none !important; }
+      `;
+      document.head.appendChild(hideStyle);
+
+      const logo = document.createElement('img');
+      logo.src = 'http://static.naver.net/maps/mantle/2x/new-naver-logo-normal.png';
+      logo.setAttribute('data-custom-logo', '');
+      logo.alt = 'NAVER';
+      logo.style.cssText = `
+        position: absolute;
+        left: 6px;
+        top: 50%;
+        transform: translateY(-50%) rotate(-90deg);
+        transform-origin: center center;
+        z-index: 10;
+        pointer-events: none;
+        width: 52px;
+        opacity: 0.6;
+        user-select: none;
+      `;
+      el.appendChild(logo);
+      this._logoEl = logo as unknown as HTMLDivElement;
     } catch (e) {
       console.error("Naver Maps init failed:", e);
       this.error = true;
@@ -242,6 +275,9 @@ class MapStore {
     this.stopWatchingLocation();
     this.clearGpxRoute();
     this.clearMemberMarkers();
+    this._logoEl?.remove();
+    this._logoEl = null;
+    document.head.querySelector('style[data-map-logo-hide]')?.remove();
     this.map?.destroy();
     this.map = null;
   }

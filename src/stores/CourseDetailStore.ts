@@ -11,6 +11,7 @@ class CourseDetailStore {
   public likeCount: number = 0;
   public userHasLiked: boolean = false;
   public likeLoading: boolean = false;
+  public secondaryLoading: boolean = true;
 
   public comments: CourseComment[] = [];
   public commentBody: string = '';
@@ -27,64 +28,52 @@ class CourseDetailStore {
   public setCommentBody(v: string): void { this.commentBody = v; }
 
   public async fetch(): Promise<void> {
-    this.loading = true;
+    runInAction(() => { this.loading = true; });
 
-    const { data: userData } = await supabase.auth.getUser();
-    const uid = userData?.user?.id ?? null;
-    runInAction(() => { this.currentUserId = uid; });
-
-    // Fetch course
-    const { data, error } = await supabase
-      .from('courses')
-      .select('*')
-      .eq('id', this.courseId)
-      .single();
+    // auth + course 병렬 로드
+    const [{ data: userData }, { data, error }] = await Promise.all([
+      supabase.auth.getUser(),
+      supabase.from('courses').select('*').eq('id', this.courseId).single(),
+    ]);
 
     if (error || !data) {
-      runInAction(() => {
-        this.notFound = true;
-        this.loading = false;
-      });
+      runInAction(() => { this.notFound = true; this.loading = false; });
       return;
     }
 
+    const uid = userData?.user?.id ?? null;
+
+    // 코스 데이터 즉시 반영 → 페이지 렌더 + GPX 다운로드 즉시 시작
+    runInAction(() => {
+      this.course = data as Course;
+      this.currentUserId = uid;
+      this.loading = false;
+    });
+
+    // 좋아요 수 / 내 좋아요 / 댓글 병렬 로드 (백그라운드)
     try {
-      // Fetch like count
-      const { count: likeCount } = await supabase
-        .from('course_likes')
-        .select('*', { count: 'exact', head: true })
-        .eq('course_id', this.courseId);
-
-      // Fetch user's own like
-      let userHasLiked = false;
-      if (uid) {
-        const { data: myLike } = await supabase
-          .from('course_likes')
-          .select('user_id')
-          .eq('course_id', this.courseId)
-          .eq('user_id', uid)
-          .single();
-        userHasLiked = !!myLike;
-      }
-
-      // Fetch comments
-      const { data: comments } = await supabase
-        .from('course_comments')
-        .select('*')
-        .eq('course_id', this.courseId)
-        .order('created_at', { ascending: false });
+      const [
+        { count: likeCount },
+        myLikeResult,
+        { data: comments },
+      ] = await Promise.all([
+        supabase.from('course_likes').select('*', { count: 'exact', head: true }).eq('course_id', this.courseId),
+        uid
+          ? supabase.from('course_likes').select('user_id').eq('course_id', this.courseId).eq('user_id', uid).single()
+          : Promise.resolve({ data: null }),
+        supabase.from('course_comments').select('*').eq('course_id', this.courseId).order('created_at', { ascending: false }),
+      ]);
 
       runInAction(() => {
-        this.course = data as Course;
         this.likeCount = likeCount ?? 0;
-        this.userHasLiked = userHasLiked;
+        this.userHasLiked = !!(myLikeResult as { data: unknown }).data;
         this.comments = (comments ?? []) as CourseComment[];
-        this.loading = false;
+        this.secondaryLoading = false;
       });
     } catch {
       runInAction(() => {
         this.error = '데이터를 불러올 수 없습니다';
-        this.loading = false;
+        this.secondaryLoading = false;
       });
     }
   }
