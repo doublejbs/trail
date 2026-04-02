@@ -24,6 +24,14 @@ class AuthCallbackStore {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     console.log('[AuthCallback] exchange result:', { session: !!data.session, error });
     const success = !error && !!data.session;
+    if (success) {
+      const pendingToken = sessionStorage.getItem('pendingInviteToken');
+      if (pendingToken) {
+        sessionStorage.removeItem('pendingInviteToken');
+        this.navigate(`/invite/${pendingToken}`, { replace: true });
+        return;
+      }
+    }
     this.navigate(success ? next : '/login', { replace: true });
   }
 }

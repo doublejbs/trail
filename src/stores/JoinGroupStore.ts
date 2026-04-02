@@ -24,6 +24,7 @@ class JoinGroupStore {
     });
 
     if (!session) {
+      sessionStorage.setItem('pendingInviteToken', token);
       this.navigate(`/login?next=${encodeURIComponent(`/invite/${token}`)}`, { replace: true });
       return;
     }

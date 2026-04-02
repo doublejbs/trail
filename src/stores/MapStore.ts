@@ -111,8 +111,8 @@ class MapStore {
     this.endMarker?.setMap(null);
     this.endMarker = null;
 
-    // 포인트 간 2km 이상 간격이면 세그먼트 분리
-    const GAP_THRESHOLD = 2000;
+    // 포인트 간 150m 이상 간격이면 세그먼트 분리 (트레일 구간 분리)
+    const GAP_THRESHOLD = 150;
     const segments: naver.maps.LatLng[][] = [[]];
     for (let i = 0; i < allPoints.length; i++) {
       const pt = new window.naver.maps.LatLng(allPoints[i].lat, allPoints[i].lon);

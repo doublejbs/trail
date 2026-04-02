@@ -142,3 +142,82 @@ gpx-files/           # 그룹 직접 업로드 GPX + 썸네일
 ### npm 설정
 
 `.npmrc`에 `legacy-peer-deps=true` 설정. npm registry가 사내 Artifactory로 설정되어 있을 수 있으므로 패키지 설치 시 `--registry https://registry.npmjs.org/` 플래그가 필요할 수 있다.
+
+## 코드베이스 레퍼런스
+
+### 스토어 목록 (`src/stores/`)
+
+| 파일 | 역할 | navigate 주입 |
+|------|------|:---:|
+| AuthStore | 세션 관리 | |
+| AuthCallbackStore | OAuth 콜백 처리 | O |
+| LoginStore | 로그인 | O |
+| GroupStore | 그룹 목록 | |
+| GroupCreateStore | 그룹 생성 | O |
+| GroupMapStore | 그룹 지도/트래킹 | O |
+| GroupSettingsStore | 그룹 설정 | O |
+| GroupInviteStore | 초대 링크 | |
+| JoinGroupStore | 그룹 참여 | O |
+| CourseStore | 코스 목록 | |
+| CourseDetailStore | 코스 상세 | |
+| CourseUploadStore | 코스 업로드 | |
+| MapStore | 네이버 지도 래퍼 | |
+| TrackingStore | 실시간 위치 트래킹 | |
+| LeaderboardStore | 실시간 순위 | |
+| HistoryStore | 활동 기록 | |
+| ProfileStore | 프로필 편집 | |
+
+### MapStore 핵심 설정 (`src/stores/MapStore.ts`)
+
+- `GAP_THRESHOLD = 150` (m) — 연속 포인트 간격이 150m 초과 시 별도 폴리라인 세그먼트로 분리
+- `drawGpxRoute(gpxText)` — `trkpt` 요소 파싱, 세그먼트 분리, 시작(녹색)/종료(빨간) 핀 마커 생성
+- `returnToCourse()` — `fitBounds`로 코스 전체 보기
+- `startWatchingLocation()` — 내 위치 파란 점 마커 추적
+
+### 타입 정의 (`src/types/`)
+
+**Course:** `{ id, created_by, name, description, tags, gpx_path, thumbnail_path, distance_m, elevation_gain_m, is_public, created_at }`
+
+**Group:** `{ id, name, created_by, gpx_path, gpx_bucket, thumbnail_path, created_at, max_members, period_started_at, period_ended_at }`
+- `gpx_bucket`: `'course-gpx'` (코스 선택) 또는 `'gpx-files'` (GPX 직접 업로드)
+
+**TrackingSession:** `{ id, user_id, group_id, elapsed_seconds, distance_meters, points: [{lat, lng, ts}], created_at }`
+
+### 컴포넌트 (`src/components/`)
+
+- `BottomTabBar` — 그룹/탐색/프로필 3탭, `env(safe-area-inset-bottom)` 적용
+- `NavigationBar` — `ChevronLeft` 아이콘 뒤로가기 + 타이틀, min-height 48px
+- `LargeTitle` — 26px extrabold, `calc(16px + env(safe-area-inset-top))` padding-top
+- `CourseCard` — 수평 레이아웃, 96×96 썸네일
+- `CourseThumbnail` — IntersectionObserver 기반 지연 로딩, 서명된 URL
+- `ElevationChart` — 고도 프로파일, 검정 stroke/fill
+- `ProtectedRoute` — 미인증 시 `/login?next=...` 리다이렉트
+
+### 레이아웃 패턴
+
+```tsx
+// 고정 헤더 + 스크롤 본문 + 고정 푸터 (GroupCreatePage 등에서 사용)
+<div className="h-full flex flex-col">
+  <div className="shrink-0">헤더</div>
+  <div className="flex-1 overflow-y-auto">본문</div>
+  <div className="shrink-0">푸터</div>
+</div>
+```
+
+### 디자인 토큰
+
+- 배경: `bg-white`
+- 포인트: `bg-black text-white`
+- 보조 텍스트: `text-black/30` ~ `text-black/50`
+- 테두리: `border-black/[0.06]` ~ `border-black/20`
+- 칩 버튼: `px-4 py-1.5 rounded-full text-[13px] font-semibold min-h-0 min-w-0`
+  - `min-h-0 min-w-0` 필수 — 전역 `button { min-height: 44px }` 오버라이드
+- 카드: `rounded-2xl border border-black/[0.06]`
+- 폰트: Plus Jakarta Sans (Google Fonts CDN, `index.html`)
+
+### 모바일 Safari 설정 (`index.html` + `src/index.css`)
+
+- viewport: `maximum-scale=1.0, user-scalable=no, viewport-fit=cover`
+- `<meta name="theme-color" content="#ffffff">` + `<body style="background:#fff">`
+- `html, body { height: 100dvh; overflow: hidden; overscroll-behavior: none; }`
+- `input, textarea { font-size: 16px }` — iOS 자동 줌 방지
