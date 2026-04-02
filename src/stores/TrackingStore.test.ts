@@ -42,6 +42,7 @@ vi.mock('../lib/supabase', () => ({
                 order: () => ({
                   limit: () => ({
                     single: () => mockSelect(),
+                    maybeSingle: () => mockSelect(),
                   }),
                 }),
               }),
@@ -120,40 +121,6 @@ describe('TrackingStore', () => {
     });
   });
 
-  describe('pause()', () => {
-    it('isPaused를 true로 설정', async () => {
-      await store.start();
-      await store.pause();
-      expect(store.isPaused).toBe(true);
-    });
-
-    it('DB에 status=paused UPDATE 호출', async () => {
-      await store.start();
-      await store.pause();
-      expect(mockUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({ status: 'paused' })
-      );
-    });
-  });
-
-  describe('resume()', () => {
-    it('isPaused를 false로 설정', async () => {
-      await store.start();
-      await store.pause();
-      await store.resume();
-      expect(store.isPaused).toBe(false);
-    });
-
-    it('DB에 status=active UPDATE 호출', async () => {
-      await store.start();
-      await store.pause();
-      await store.resume();
-      expect(mockUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({ status: 'active' })
-      );
-    });
-  });
-
   describe('stop()', () => {
     it('isTracking을 false로 설정', async () => {
       await store.start();
@@ -167,6 +134,17 @@ describe('TrackingStore', () => {
       expect(mockUpdate).toHaveBeenCalledWith(
         expect.objectContaining({ status: 'completed' })
       );
+    });
+  });
+
+  describe('restart()', () => {
+    it('기존 세션을 완료하고 새 세션을 시작', async () => {
+      await store.start();
+      const firstInsertCount = mockInsert.mock.calls.length;
+      await store.restart();
+      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: 'completed' }));
+      expect(mockInsert.mock.calls.length).toBe(firstInsertCount + 1);
+      expect(store.isTracking).toBe(true);
     });
   });
 
@@ -209,16 +187,6 @@ describe('TrackingStore', () => {
       });
       await store.restore();
       expect(store.isTracking).toBe(true);
-      expect(store.isPaused).toBe(false);
-    });
-
-    it('paused 세션이 있으면 isPaused=true', async () => {
-      mockSelect.mockResolvedValue({
-        data: { id: 'session-1', status: 'paused', max_route_meters: 500, distance_meters: 300, started_at: new Date().toISOString() },
-      });
-      await store.restore();
-      expect(store.isTracking).toBe(true);
-      expect(store.isPaused).toBe(true);
     });
 
     it('세션이 없으면 초기 상태 유지', async () => {

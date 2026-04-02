@@ -5,7 +5,6 @@ import { haversineMeters, maxRouteProgress } from '../utils/routeProjection';
 
 class TrackingStore {
   public isTracking: boolean = false;
-  public isPaused: boolean = false;
   public points: { lat: number; lng: number; ts: number }[] = [];
   public saving: boolean = false;
   public saveError: string | null = null;
@@ -19,6 +18,7 @@ class TrackingStore {
 
   public displayName: string | null = null;
   private timerId: ReturnType<typeof setInterval> | null = null;
+  private _broadcastTimerId: ReturnType<typeof setInterval> | null = null;
   private _userId: string | null = null;
   private _channel: ReturnType<typeof supabase.channel> | null = null;
   private _sessionId: string | null = null;
@@ -45,7 +45,7 @@ class TrackingStore {
     return [h, m, s].map((v) => String(v).padStart(2, '0')).join(':');
   }
 
-  /** 페이지 로드 시 active/paused 세션 복원 */
+  /** 페이지 로드 시 active 세션 복원 */
   public async restore(): Promise<void> {
     runInAction(() => { this.restoring = true; });
     try {
@@ -57,7 +57,7 @@ class TrackingStore {
         .select('id, status, max_route_meters, distance_meters, started_at')
         .eq('user_id', user.id)
         .eq('group_id', this.groupId)
-        .in('status', ['active', 'paused'])
+        .in('status', ['active'])
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -70,7 +70,6 @@ class TrackingStore {
         this._sessionId = data.id;
         this._userId = user.id;
         this.isTracking = true;
-        this.isPaused = data.status === 'paused';
         this.maxRouteMeters = Number(data.max_route_meters) || 0;
         this.distanceMeters = Number(data.distance_meters) || 0;
         this.startedAt = startedAt;
@@ -79,10 +78,7 @@ class TrackingStore {
         }
       });
 
-      if (!this.isPaused) {
-        this._startTimer();
-      }
-      await this._initBroadcast();
+      this._startTimer();
     } catch {
       // 복원 실패 시 초기 상태 유지
     } finally {
@@ -120,7 +116,6 @@ class TrackingStore {
       this._sessionId = sessionId;
       this._userId = user.id;
       this.isTracking = true;
-      this.isPaused = false;
       this.distanceMeters = 0;
       this.points = [];
       this.saveError = null;
@@ -130,37 +125,12 @@ class TrackingStore {
     });
 
     this._startTimer();
-    void this._initBroadcast();
-  }
-
-  public async pause(): Promise<void> {
-    if (!this.isTracking || this.isPaused || !this._sessionId) return;
-    this._clearTimer();
-
-    await supabase
-      .from('tracking_sessions')
-      .update({ status: 'paused', max_route_meters: this.maxRouteMeters, distance_meters: this.distanceMeters })
-      .eq('id', this._sessionId);
-
-    runInAction(() => { this.isPaused = true; });
-  }
-
-  public async resume(): Promise<void> {
-    if (!this.isTracking || !this.isPaused || !this._sessionId) return;
-
-    await supabase
-      .from('tracking_sessions')
-      .update({ status: 'active' })
-      .eq('id', this._sessionId);
-
-    runInAction(() => { this.isPaused = false; });
-    this._startTimer();
   }
 
   public async stop(): Promise<void> {
     this._clearTimer();
     if (!this._sessionId) {
-      runInAction(() => { this.isTracking = false; this.isPaused = false; });
+      runInAction(() => { this.isTracking = false; });
       return;
     }
 
@@ -183,7 +153,6 @@ class TrackingStore {
       runInAction(() => {
         this.saving = false;
         this.isTracking = false;
-        this.isPaused = false;
         this._sessionId = null;
         this.startedAt = null;
         this.elapsedSeconds = 0;
@@ -193,23 +162,88 @@ class TrackingStore {
       runInAction(() => {
         this.saving = false;
         this.isTracking = false;
-        this.isPaused = false;
         this.saveError = e instanceof Error ? e.message : '저장 실패';
       });
       toast.error('기록 저장에 실패했습니다');
     }
   }
 
+  public async restart(): Promise<void> {
+    this._clearTimer();
+    if (this._sessionId) {
+      await supabase
+        .from('tracking_sessions')
+        .delete()
+        .eq('id', this._sessionId);
+    }
+    runInAction(() => {
+      this.isTracking = false;
+      this._sessionId = null;
+      this.startedAt = null;
+      this.elapsedSeconds = 0;
+      this.distanceMeters = 0;
+      this.maxRouteMeters = 0;
+      this.points = [];
+      this.latestLat = null;
+      this.latestLng = null;
+      this.saveError = null;
+    });
+  }
+
   public dispose(): void {
     this._clearTimer();
+    this._clearBroadcastTimer();
     if (this._channel) {
       void supabase.removeChannel(this._channel);
       runInAction(() => { this._channel = null; });
     }
   }
 
+  public setLatestPosition(lat: number, lng: number): void {
+    this.latestLat = lat;
+    this.latestLng = lng;
+  }
+
+  public async startLocationBroadcast(): Promise<void> {
+    if (this._channel) return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('id', user.id)
+        .single();
+      runInAction(() => {
+        this._userId = user.id;
+        this.displayName = profile?.display_name ?? user.email?.split('@')[0] ?? null;
+        this._channel = supabase.channel(`group-progress:${this.groupId}`);
+        this._channel.subscribe();
+      });
+    } catch {
+      return;
+    }
+
+    this._clearBroadcastTimer();
+    this._broadcastTimerId = setInterval(() => {
+      if (this._channel && this._userId) {
+        void this._channel.send({
+          type: 'broadcast',
+          event: 'progress',
+          payload: {
+            userId: this._userId,
+            displayName: this.displayName,
+            maxRouteMeters: this.maxRouteMeters,
+            lat: this.latestLat,
+            lng: this.latestLng,
+          },
+        });
+      }
+    }, 1000);
+  }
+
   public addPoint(lat: number, lng: number): void {
-    if (!this.isTracking || this.isPaused) return;
+    if (!this.isTracking) return;
     const point = { lat, lng, ts: Date.now() };
     if (this.points.length > 0) {
       const prev = this.points[this.points.length - 1];
@@ -230,46 +264,20 @@ class TrackingStore {
           this.elapsedSeconds = Math.floor((Date.now() - this.startedAt.getTime()) / 1000);
         }
       });
-      if (this._channel && this._userId) {
-        void this._channel.send({
-          type: 'broadcast',
-          event: 'progress',
-          payload: {
-            userId: this._userId,
-            displayName: this.displayName,
-            maxRouteMeters: this.maxRouteMeters,
-            lat: this.latestLat,
-            lng: this.latestLng,
-          },
-        });
-      }
     }, 1000);
-  }
-
-  private async _initBroadcast(): Promise<void> {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('display_name')
-        .eq('id', user.id)
-        .single();
-      runInAction(() => {
-        this._userId = user.id;
-        this.displayName = profile?.display_name ?? user.email?.split('@')[0] ?? null;
-        this._channel = supabase.channel(`group-progress:${this.groupId}`);
-        this._channel.subscribe();
-      });
-    } catch {
-      // broadcast 실패 시 silent
-    }
   }
 
   private _clearTimer(): void {
     if (this.timerId !== null) {
       clearInterval(this.timerId);
       this.timerId = null;
+    }
+  }
+
+  private _clearBroadcastTimer(): void {
+    if (this._broadcastTimerId !== null) {
+      clearInterval(this._broadcastTimerId);
+      this._broadcastTimerId = null;
     }
   }
 }

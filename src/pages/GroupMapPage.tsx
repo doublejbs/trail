@@ -2,6 +2,7 @@ import { useRef, useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
 import { NavigationBar } from '../components/NavigationBar';
+import { RestartConfirmSheet } from '../components/RestartConfirmSheet';
 import { runInAction, autorun, reaction } from 'mobx';
 import { Button } from '@/components/ui/button';
 import { Crosshair, Trophy, X, Settings, TrendingUp } from 'lucide-react';
@@ -12,6 +13,7 @@ import { TrackingStore } from '../stores/TrackingStore';
 import { LeaderboardStore } from '../stores/LeaderboardStore';
 import { parseGpxPoints, totalRouteDistance } from '../utils/routeProjection';
 import { parseGpxCoords } from '../lib/gpx';
+import { supabase } from '../lib/supabase';
 import type { Ranking } from '../stores/LeaderboardStore';
 
 export const GroupMapPage = observer(() => {
@@ -24,6 +26,7 @@ export const GroupMapPage = observer(() => {
   const [leaderboardStore] = useState(() => new LeaderboardStore(id!));
   const [activeTab, setActiveTab] = useState<'map' | 'leaderboard'>('map');
   const [showElevation, setShowElevation] = useState(false);
+  const [showRestartConfirm, setShowRestartConfirm] = useState(false);
 
   const routePoints = useMemo(
     () => (store.gpxText ? parseGpxPoints(store.gpxText) : []),
@@ -40,11 +43,32 @@ export const GroupMapPage = observer(() => {
     return store.load(id);
   }, [store, id]);
 
+  // 아바타 URL 로드 → MapStore에 전달
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return;
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('avatar_path')
+        .eq('id', user.id)
+        .single();
+      if (!profile?.avatar_path) return;
+      const { data: signed } = await supabase.storage
+        .from('avatars')
+        .createSignedUrl(profile.avatar_path, 3600);
+      if (signed?.signedUrl) mapStore.setLocationAvatarUrl(signed.signedUrl);
+    });
+  }, [mapStore]);
+
   // 지도 초기화 — 그룹 데이터 로드 즉시
   useEffect(() => {
     if (!mapRef.current || !store.group) return;
     mapStore.initMap(mapRef.current);
-    mapStore.startWatchingLocation((lat, lng) => trackingStore.addPoint(lat, lng));
+    mapStore.startWatchingLocation((lat, lng) => {
+      trackingStore.setLatestPosition(lat, lng);
+      trackingStore.addPoint(lat, lng);
+    });
+    void trackingStore.startLocationBroadcast();
     return () => { mapStore.destroy(); };
   }, [mapStore, trackingStore, store.group]);
 
@@ -101,7 +125,7 @@ export const GroupMapPage = observer(() => {
       leaderboardStore.rankings.forEach((r) => {
         if (r.userId === store.currentUserId) return;
         if (r.lat != null && r.lng != null) {
-          mapStore.updateMemberMarker(r.userId, r.displayName, r.lat, r.lng);
+          mapStore.updateMemberMarker(r.userId, r.displayName, r.lat, r.lng, r.avatarUrl);
         }
       });
     });
@@ -154,6 +178,7 @@ export const GroupMapPage = observer(() => {
   };
 
   return (
+    <>
     <div className="absolute inset-0 flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <NavigationBar
         title={store.group.name}
@@ -337,32 +362,14 @@ export const GroupMapPage = observer(() => {
               저장 중...
             </button>
           )}
-          {!trackingStore.saving && !trackingStore.isPaused && (
+          {!trackingStore.saving && (
             <button
-              onClick={() => void trackingStore.pause()}
-              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); void trackingStore.pause(); }}
+              onClick={() => setShowRestartConfirm(true)}
+              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); setShowRestartConfirm(true); }}
               className="w-full py-3 rounded-xl text-[14px] font-semibold bg-black/[0.08] text-black/60"
             >
-              일시정지
+              재시작
             </button>
-          )}
-          {!trackingStore.saving && trackingStore.isPaused && (
-            <div className="flex gap-2">
-              <button
-                onClick={() => void trackingStore.resume()}
-                onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); void trackingStore.resume(); }}
-                className="flex-1 py-3 rounded-xl text-[14px] font-semibold bg-black text-white"
-              >
-                재개
-              </button>
-              <button
-                onClick={() => void trackingStore.stop()}
-                onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); void trackingStore.stop(); }}
-                className="flex-1 py-3 rounded-xl text-[14px] font-semibold bg-red-500 text-white"
-              >
-                종료
-              </button>
-            </div>
           )}
         </div>
         </div>
@@ -456,5 +463,12 @@ export const GroupMapPage = observer(() => {
 
       </div>
     </div>
+
+    <RestartConfirmSheet
+      open={showRestartConfirm}
+      onConfirm={() => { setShowRestartConfirm(false); void trackingStore.restart(); }}
+      onCancel={() => setShowRestartConfirm(false)}
+    />
+    </>
   );
 });

@@ -140,7 +140,7 @@ export const GroupSettingsPage = observer(() => {
                   <div className="w-8 h-8 rounded-full bg-black/[0.06] flex items-center justify-center">
                     <UserMinus size={14} className="text-black/25" />
                   </div>
-                  <span className="text-[14px] text-black/70 font-medium truncate">{m.user_id}</span>
+                  <span className="text-[14px] text-black/70 font-medium truncate">{m.profiles?.display_name ?? m.user_id}</span>
                 </div>
               ))}
             </div>

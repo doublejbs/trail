@@ -25,6 +25,20 @@ class AuthCallbackStore {
       return;
     }
 
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', session.user.id)
+      .maybeSingle();
+
+    if (!profile?.display_name) {
+      const destination = sessionStorage.getItem('pendingInviteToken')
+        ? null
+        : (next || '/');
+      this.navigate(`/setup-profile${destination ? `?next=${encodeURIComponent(destination)}` : ''}`, { replace: true });
+      return;
+    }
+
     const pendingToken = sessionStorage.getItem('pendingInviteToken');
     if (pendingToken) {
       sessionStorage.removeItem('pendingInviteToken');

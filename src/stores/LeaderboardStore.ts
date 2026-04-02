@@ -8,6 +8,7 @@ interface Ranking {
   isLive: boolean;
   lat: number | null;
   lng: number | null;
+  avatarUrl: string | null;
 }
 
 class LeaderboardStore {
@@ -49,14 +50,23 @@ class LeaderboardStore {
 
       const userIds = [...maxByUser.keys()];
       const nameMap = new Map<string, string>();
+      const avatarUrlMap = new Map<string, string | null>();
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('id, display_name')
+          .select('id, display_name, avatar_path')
           .in('id', userIds);
-        for (const p of profiles ?? []) {
+        await Promise.all((profiles ?? []).map(async (p) => {
           nameMap.set(p.id, p.display_name);
-        }
+          if (p.avatar_path) {
+            const { data: signed } = await supabase.storage
+              .from('avatars')
+              .createSignedUrl(p.avatar_path, 3600);
+            avatarUrlMap.set(p.id, signed?.signedUrl ?? null);
+          } else {
+            avatarUrlMap.set(p.id, null);
+          }
+        }));
       }
 
       runInAction(() => {
@@ -68,6 +78,7 @@ class LeaderboardStore {
             isLive: false,
             lat: null,
             lng: null,
+            avatarUrl: avatarUrlMap.get(userId) ?? null,
           }))
           .sort((a, b) => b.maxRouteMeters - a.maxRouteMeters);
         this.loading = false;
@@ -98,7 +109,7 @@ class LeaderboardStore {
           if (lat != null) existing.lat = lat;
           if (lng != null) existing.lng = lng;
         } else {
-          this.rankings.push({ userId, displayName, maxRouteMeters, isLive: true, lat, lng });
+          this.rankings.push({ userId, displayName, maxRouteMeters, isLive: true, lat, lng, avatarUrl: null });
         }
         this.rankings.sort((a, b) => b.maxRouteMeters - a.maxRouteMeters);
       });

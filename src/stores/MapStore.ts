@@ -18,6 +18,7 @@ class MapStore {
 
   private watchId: number | null = null;
   private lastPosition: { latitude: number; longitude: number } | null = null;
+  private locationAvatarUrl: string | null = null;
   private _memberMarkers: Map<string, naver.maps.Marker> = new Map();
   private _logoEl: HTMLDivElement | null = null;
 
@@ -246,7 +247,7 @@ class MapStore {
     this.endMarker = null;
   }
 
-  public updateMemberMarker(userId: string, displayName: string, lat: number, lng: number): void {
+  public updateMemberMarker(userId: string, displayName: string, lat: number, lng: number, avatarUrl?: string | null): void {
     if (!this.map) return;
     const latLng = new window.naver.maps.LatLng(lat, lng);
     const existing = this._memberMarkers.get(userId);
@@ -254,12 +255,22 @@ class MapStore {
       existing.setPosition(latLng);
     } else {
       const initial = displayName.charAt(0).toUpperCase() || '?';
+      const inner = avatarUrl
+        ? `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`
+        : `<div style="width:100%;height:100%;border-radius:50%;background:#222;display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:bold;">${initial}</div>`;
+      const content = `
+        <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+          <div style="width:32px;height:32px;border-radius:50%;overflow:hidden;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.2);background:white;flex-shrink:0;">
+            ${inner}
+          </div>
+          <div style="background:rgba(0,0,0,0.72);color:white;border-radius:4px;padding:2px 5px;font-size:10px;font-weight:600;white-space:nowrap;max-width:64px;overflow:hidden;text-overflow:ellipsis;letter-spacing:-0.01em;">${displayName}</div>
+        </div>`;
       const marker = new window.naver.maps.Marker({
         map: this.map,
         position: latLng,
         icon: {
-          content: `<div style="display:flex;flex-direction:column;align-items:center;gap:2px"><div style="background:#FF6B35;color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:bold;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3)">${initial}</div><div style="background:rgba(0,0,0,0.7);color:white;border-radius:4px;padding:1px 4px;font-size:10px;white-space:nowrap;max-width:60px;overflow:hidden;text-overflow:ellipsis">${displayName}</div></div>`,
-          anchor: new window.naver.maps.Point(14, 14),
+          content,
+          anchor: new window.naver.maps.Point(16, 16),
         },
       });
       this._memberMarkers.set(userId, marker);
@@ -307,6 +318,41 @@ class MapStore {
     this.locationMarker = null;
   }
 
+  private _buildLocationMarkerContent(): string {
+    const avatarUrl = this.locationAvatarUrl;
+    const inner = avatarUrl
+      ? `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`
+      : `<div style="width:100%;height:100%;border-radius:50%;background:#222;"></div>`;
+
+    return `
+      <style>
+        @keyframes loc-pulse {
+          0%   { transform: scale(1);   opacity: 0.5; }
+          70%  { transform: scale(2.2); opacity: 0; }
+          100% { transform: scale(2.2); opacity: 0; }
+        }
+        @keyframes loc-pulse2 {
+          0%   { transform: scale(1);   opacity: 0.3; }
+          70%  { transform: scale(1.7); opacity: 0; }
+          100% { transform: scale(1.7); opacity: 0; }
+        }
+      </style>
+      <div style="position:relative;width:60px;height:60px;display:flex;align-items:center;justify-content:center;">
+        <div style="position:absolute;width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,0.15);animation:loc-pulse 2s ease-out infinite;z-index:0;"></div>
+        <div style="position:absolute;width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,0.1);animation:loc-pulse2 2s ease-out 0.4s infinite;z-index:0;"></div>
+        <div style="position:relative;width:36px;height:36px;border-radius:50%;overflow:hidden;border:2.5px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.25);flex-shrink:0;z-index:1;background:white;">
+          ${inner}
+        </div>
+      </div>`;
+  }
+
+  public setLocationAvatarUrl(url: string | null): void {
+    this.locationAvatarUrl = url;
+    if (this.locationMarker) {
+      this.locationMarker.setIcon({ content: this._buildLocationMarkerContent(), anchor: new window.naver.maps.Point(30, 30) });
+    }
+  }
+
   public startWatchingLocation(onLocationUpdate?: (lat: number, lng: number) => void): void {
     if (!this.map) return;
     if (!navigator.geolocation) return;
@@ -324,8 +370,8 @@ class MapStore {
               map: this.map!,
               position: latLng,
               icon: {
-                content: '<div style="width:14px;height:14px;border-radius:50%;background:#4A90D9;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3);"></div>',
-                anchor: new window.naver.maps.Point(7, 7),
+                content: this._buildLocationMarkerContent(),
+                anchor: new window.naver.maps.Point(30, 30),
               },
             });
           } else {

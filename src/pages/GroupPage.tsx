@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
-import { Plus, ChevronRight } from 'lucide-react';
+import { Plus, ChevronRight, User } from 'lucide-react';
 import { GroupStore } from '../stores/GroupStore';
-import { LargeTitle } from '../components/LargeTitle';
 import { supabase } from '../lib/supabase';
 import type { Group } from '../types/group';
 
@@ -92,7 +91,16 @@ export const GroupPage = observer(() => {
   return (
     <div className="h-full flex flex-col bg-white">
       <div className="flex-1 overflow-y-auto">
-        <LargeTitle title="그룹" />
+        <div className="flex items-end justify-between px-5 pb-3" style={{ paddingTop: 'calc(16px + env(safe-area-inset-top))' }}>
+          <h1 className="text-[26px] font-extrabold tracking-tight text-black">그룹</h1>
+          <button
+            onClick={() => navigate('/profile')}
+            aria-label="프로필"
+            className="flex items-center justify-center active:opacity-50 transition-opacity mb-0.5"
+          >
+            <User size={22} strokeWidth={1.6} className="text-black/40" />
+          </button>
+        </div>
 
         {/* Segmented control */}
         <div className="flex gap-1.5 px-5 pb-1.5">

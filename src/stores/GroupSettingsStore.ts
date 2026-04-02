@@ -70,17 +70,30 @@ class GroupSettingsStore {
   }
 
   public async fetchMembers(groupId: string): Promise<void> {
-    const { data, error } = await supabase
+    const { data: memberData, error } = await supabase
       .from('group_members')
       .select('*')
       .eq('group_id', groupId);
 
+    if (error) {
+      runInAction(() => { this.error = error.message; });
+      return;
+    }
+
+    const members = memberData ?? [];
+    const userIds = members.map((m) => m.user_id);
+
+    const { data: profileData } = userIds.length
+      ? await supabase.from('profiles').select('id, display_name').in('id', userIds)
+      : { data: [] };
+
+    const profileMap = Object.fromEntries((profileData ?? []).map((p) => [p.id, p.display_name]));
+
     runInAction(() => {
-      if (error) {
-        this.error = error.message;
-      } else {
-        this.members = data ?? [];
-      }
+      this.members = members.map((m) => ({
+        ...m,
+        profiles: { display_name: profileMap[m.user_id] ?? null },
+      }));
     });
   }
 

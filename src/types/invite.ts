@@ -11,4 +11,5 @@ export interface GroupMember {
   group_id: string;
   user_id: string;
   joined_at: string;
+  profiles?: { display_name: string | null } | null;
 }

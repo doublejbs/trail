@@ -13,6 +13,7 @@ import { CourseDetailPage } from './pages/CourseDetailPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { HistoryPage } from './pages/HistoryPage';
 import { InvitePage } from './pages/InvitePage';
+import { SetupProfilePage } from './pages/SetupProfilePage';
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route path="/invite/:token" element={<InvitePage />} />
+        <Route path="/setup-profile" element={<SetupProfilePage />} />
 
         {/* Protected routes */}
         <Route
