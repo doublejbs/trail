@@ -20,7 +20,7 @@ class TrackingStore {
   private timerId: ReturnType<typeof setInterval> | null = null;
   private _lastBroadcastLat: number | null = null;
   private _lastBroadcastLng: number | null = null;
-  private _positionSaveCounter: number = 0;
+  private _positionSaveTimerId: ReturnType<typeof setInterval> | null = null;
   private _userId: string | null = null;
   private _channel: ReturnType<typeof supabase.channel> | null = null;
   private _sessionId: string | null = null;
@@ -194,6 +194,19 @@ class TrackingStore {
 
   public dispose(): void {
     this._clearTimer();
+    if (this._positionSaveTimerId !== null) {
+      clearInterval(this._positionSaveTimerId);
+      this._positionSaveTimerId = null;
+    }
+    if (this._userId && this.latestLat !== null && this.latestLng !== null) {
+      void supabase.from('group_member_positions').upsert({
+        user_id: this._userId,
+        group_id: this.groupId,
+        lat: this.latestLat,
+        lng: this.latestLng,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id,group_id' });
+    }
     if (this._channel) {
       void supabase.removeChannel(this._channel);
       runInAction(() => { this._channel = null; });
@@ -227,7 +240,20 @@ class TrackingStore {
       });
     } catch {
       // silent
+      return;
     }
+
+    this._positionSaveTimerId = setInterval(() => {
+      if (this._userId && this.latestLat !== null && this.latestLng !== null) {
+        void supabase.from('group_member_positions').upsert({
+          user_id: this._userId,
+          group_id: this.groupId,
+          lat: this.latestLat,
+          lng: this.latestLng,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,group_id' });
+      }
+    }, 5000);
   }
 
   private _maybeBroadcast(lat: number, lng: number): void {
@@ -253,19 +279,6 @@ class TrackingStore {
         lng,
       },
     });
-
-    // 5번 브로드캐스트마다 DB 저장
-    this._positionSaveCounter += 1;
-    if (this._positionSaveCounter >= 5) {
-      this._positionSaveCounter = 0;
-      void supabase.from('group_member_positions').upsert({
-        user_id: this._userId,
-        group_id: this.groupId,
-        lat,
-        lng,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id,group_id' });
-    }
   }
 
   public addPoint(lat: number, lng: number): void {

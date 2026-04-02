@@ -69,24 +69,45 @@ class LeaderboardStore {
         }));
       }
 
+      // group_member_positions에서 그룹 전체 위치 조회 (tracking session 없는 멤버 포함)
       const positionMap = new Map<string, { lat: number; lng: number }>();
-      if (userIds.length > 0) {
-        const { data: positions } = await supabase
-          .from('group_member_positions')
-          .select('user_id, lat, lng')
-          .eq('group_id', this.groupId)
-          .in('user_id', userIds);
-        for (const p of positions ?? []) {
-          positionMap.set(p.user_id, { lat: p.lat, lng: p.lng });
-        }
+      const { data: positions } = await supabase
+        .from('group_member_positions')
+        .select('user_id, lat, lng')
+        .eq('group_id', this.groupId);
+      for (const p of positions ?? []) {
+        positionMap.set(p.user_id, { lat: p.lat, lng: p.lng });
       }
 
+      // tracking session 없지만 위치가 있는 멤버 프로필 추가 조회
+      const positionOnlyIds = [...positionMap.keys()].filter((id) => !maxByUser.has(id));
+      if (positionOnlyIds.length > 0) {
+        const { data: extraProfiles } = await supabase
+          .from('profiles')
+          .select('id, display_name, avatar_path')
+          .in('id', positionOnlyIds);
+        await Promise.all((extraProfiles ?? []).map(async (p) => {
+          nameMap.set(p.id, p.display_name);
+          if (p.avatar_path) {
+            const { data: signed } = await supabase.storage
+              .from('avatars')
+              .createSignedUrl(p.avatar_path, 3600);
+            avatarUrlMap.set(p.id, signed?.signedUrl ?? null);
+          } else {
+            avatarUrlMap.set(p.id, null);
+          }
+        }));
+      }
+
+      // 전체 유저 집합: tracking session + position-only
+      const allUserIds = new Set([...maxByUser.keys(), ...positionMap.keys()]);
+
       runInAction(() => {
-        this.rankings = [...maxByUser.entries()]
-          .map(([userId, maxRouteMeters]) => ({
+        this.rankings = [...allUserIds]
+          .map((userId) => ({
             userId,
             displayName: nameMap.get(userId) ?? '알 수 없음',
-            maxRouteMeters,
+            maxRouteMeters: maxByUser.get(userId) ?? 0,
             isLive: false,
             lat: positionMap.get(userId)?.lat ?? null,
             lng: positionMap.get(userId)?.lng ?? null,
