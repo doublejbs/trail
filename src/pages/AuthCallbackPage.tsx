@@ -13,9 +13,8 @@ export function AuthCallbackPage() {
     : "/";
 
   useEffect(() => {
-    const code = searchParams.get("code");
-    store.handleCallback(code, next);
-  }, [store, searchParams, next]);
+    store.handleCallback(next);
+  }, [store, next]);
 
   return (
     <div

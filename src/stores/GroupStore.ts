@@ -9,7 +9,7 @@ class GroupStore {
   public loading: boolean = true;
   public error: boolean = false;
   public currentUserId: string | null = null;
-  public activeTab: Tab = 'owned';
+  public activeTab: Tab = 'joined';
 
   public constructor() {
     makeAutoObservable(this);

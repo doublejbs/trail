@@ -97,17 +97,6 @@ export const GroupPage = observer(() => {
         {/* Segmented control */}
         <div className="flex gap-1.5 px-5 pb-1.5">
           <button
-            onClick={() => store.setActiveTab('owned')}
-            aria-pressed={store.activeTab === 'owned'}
-            className={`px-4 py-1.5 rounded-full text-[13px] font-semibold min-h-0 min-w-0 transition-colors ${
-              store.activeTab === 'owned'
-                ? 'bg-black text-white'
-                : 'bg-black/[0.05] text-black/45'
-            }`}
-          >
-            내가 만든
-          </button>
-          <button
             onClick={() => store.setActiveTab('joined')}
             aria-pressed={store.activeTab === 'joined'}
             className={`px-4 py-1.5 rounded-full text-[13px] font-semibold min-h-0 min-w-0 transition-colors ${
@@ -117,6 +106,17 @@ export const GroupPage = observer(() => {
             }`}
           >
             참여중
+          </button>
+          <button
+            onClick={() => store.setActiveTab('owned')}
+            aria-pressed={store.activeTab === 'owned'}
+            className={`px-4 py-1.5 rounded-full text-[13px] font-semibold min-h-0 min-w-0 transition-colors ${
+              store.activeTab === 'owned'
+                ? 'bg-black text-white'
+                : 'bg-black/[0.05] text-black/45'
+            }`}
+          >
+            내가 만든
           </button>
         </div>
 
