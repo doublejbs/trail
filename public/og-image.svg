@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#0D0D0D"/>
+
+  <!-- Subtle grid lines -->
+  <line x1="0" y1="210" x2="1200" y2="210" stroke="white" stroke-opacity="0.04" stroke-width="1"/>
+  <line x1="0" y1="420" x2="1200" y2="420" stroke="white" stroke-opacity="0.04" stroke-width="1"/>
+  <line x1="400" y1="0" x2="400" y2="630" stroke="white" stroke-opacity="0.04" stroke-width="1"/>
+  <line x1="800" y1="0" x2="800" y2="630" stroke="white" stroke-opacity="0.04" stroke-width="1"/>
+
+  <!-- Large ghost pin (background decoration) -->
+  <path d="M960 430 C940 390,870 340,870 280 A90 90 0 1 1 1050 280 C1050 340,980 390,960 430Z"
+        fill="white" opacity="0.04"/>
+
+  <!-- Pin logo -->
+  <g transform="translate(490, 155) scale(3.8)">
+    <path d="M20 50 C16 43,0 33,0 20 A20 20 0 1 1 40 20 C40 33,24 43,20 50Z" fill="white"/>
+    <text
+      x="20" y="20"
+      text-anchor="middle"
+      dominant-baseline="central"
+      font-family="Impact, 'Arial Narrow', sans-serif"
+      font-size="11"
+      font-weight="900"
+      font-style="italic"
+      fill="#0D0D0D"
+      letter-spacing="0.5"
+      transform="rotate(-14, 20, 20)"
+    >WPT</text>
+  </g>
+
+  <!-- waypoint wordmark -->
+  <text
+    x="600" y="460"
+    text-anchor="middle"
+    font-family="'Plus Jakarta Sans', 'Arial Black', Arial, sans-serif"
+    font-size="88"
+    font-weight="800"
+    fill="white"
+    letter-spacing="-3"
+  >waypoint</text>
+
+  <!-- Tagline -->
+  <text
+    x="600" y="528"
+    text-anchor="middle"
+    font-family="'Plus Jakarta Sans', Arial, sans-serif"
+    font-size="26"
+    font-weight="400"
+    fill="white"
+    opacity="0.4"
+    letter-spacing="0"
+  >같은 경로를, 함께</text>
+</svg>
