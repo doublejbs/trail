@@ -1,7 +1,7 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
-import { haversineMeters, maxRouteProgress } from '../utils/routeProjection';
+import { haversineMeters, maxRouteProgress, totalRouteDistance } from '../utils/routeProjection';
 import type { Checkpoint } from '../types/checkpoint';
 
 class TrackingStore {
@@ -18,6 +18,7 @@ class TrackingStore {
   public elapsedSeconds: number = 0;
 
   public displayName: string | null = null;
+  public isFinished: boolean = false;
   public checkpoints: Checkpoint[] = [];
   public visitedCheckpointIds: Set<string> = new Set();
   public nearCheckpointId: string | null = null;
@@ -144,6 +145,9 @@ class TrackingStore {
       this.maxRouteMeters = 0;
       this.startedAt = now;
       this.elapsedSeconds = 0;
+      this.visitedCheckpointIds = new Set();
+      this.nearCheckpointId = null;
+      this.isFinished = false;
     });
 
     this._startTimer();
@@ -367,9 +371,20 @@ class TrackingStore {
   }
 
   public async visitCheckpoint(checkpointId: string): Promise<void> {
-    if (this.nearCheckpointId !== checkpointId) return;
-    if (!this._sessionId || !this._userId) return;
     if (this.visitedCheckpointIds.has(checkpointId)) return;
+    if (!this._sessionId || !this._userId || !this.isTracking) {
+      toast('트래킹을 시작해야 체크포인트를 인증할 수 있습니다');
+      return;
+    }
+
+    // 탭 시점에 실제 거리로 재확인
+    const cp = this.checkpoints.find((c) => c.id === checkpointId);
+    if (!cp || this.latestLat === null || this.latestLng === null) return;
+    const dist = haversineMeters(this.latestLat, this.latestLng, cp.lat, cp.lng);
+    if (dist > cp.radius_m) {
+      toast(`체크포인트 반경 안에 들어와야 인증할 수 있습니다 (${Math.round(dist)}m/${cp.radius_m}m)`);
+      return;
+    }
 
     const { error } = await supabase.from('checkpoint_visits').insert({
       user_id: this._userId,
@@ -378,6 +393,8 @@ class TrackingStore {
     });
 
     if (error) return;
+
+    const checkpoint = this.checkpoints.find((cp) => cp.id === checkpointId);
 
     runInAction(() => {
       this.visitedCheckpointIds = new Set([...this.visitedCheckpointIds, checkpointId]);
@@ -398,6 +415,15 @@ class TrackingStore {
           checkpointsVisited: this.visitedCheckpointIds.size,
         },
       });
+    }
+
+    // 종료 체크포인트 통과 시 트래킹 완료
+    if (checkpoint?.is_finish) {
+      runInAction(() => {
+        this.maxRouteMeters = totalRouteDistance(this.routePoints);
+      });
+      runInAction(() => { this.isFinished = true; });
+      await this.stop();
     }
   }
 

@@ -312,12 +312,17 @@ class MapStore {
 
       const existing = this._checkpointMarkers.get(cp.id);
       const position = new window.naver.maps.LatLng(cp.lat, cp.lng);
+      const anchor = isNear
+        ? new window.naver.maps.Point(24, 24)
+        : (isVisited || cp.is_finish)
+          ? new window.naver.maps.Point(18, 18)
+          : new window.naver.maps.Point(16, 16);
 
       if (existing) {
         existing.setPosition(position);
         existing.setIcon({
           content: this._buildCheckpointHtml(cp, displayOrder, isVisited, isNear),
-          anchor: new window.naver.maps.Point(16, 16),
+          anchor,
         });
       } else {
         const marker = new window.naver.maps.Marker({
@@ -325,7 +330,7 @@ class MapStore {
           position,
           icon: {
             content: this._buildCheckpointHtml(cp, displayOrder, isVisited, isNear),
-            anchor: new window.naver.maps.Point(16, 16),
+            anchor,
           },
           zIndex: 100,
         });
@@ -388,18 +393,27 @@ class MapStore {
     isNear: boolean,
   ): string {
     if (isVisited) {
-      return `<div style="width:32px;height:32px;border-radius:50%;background:#22C55E;display:flex;align-items:center;justify-content:center;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.2);">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      return `<div style="width:36px;height:36px;border-radius:50%;background:#22C55E;display:flex;align-items:center;justify-content:center;border:2.5px solid white;box-shadow:0 2px 8px rgba(34,197,94,0.4);">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>`;
+    }
+    if (isNear) {
+      const label = cp.is_finish ? '종료' : displayOrder;
+      const bg = cp.is_finish ? '#F44336' : '#000';
+      const glow = cp.is_finish ? 'rgba(244,67,54,0.5)' : 'rgba(0,0,0,0.35)';
+      return `<div style="position:relative;width:48px;height:48px;display:flex;align-items:center;justify-content:center;">
+        <div style="position:absolute;inset:0;border-radius:50%;background:${bg};opacity:0.15;animation:cp-ring 1.5s ease-in-out infinite;"></div>
+        <div style="width:40px;height:40px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;color:white;font-size:${cp.is_finish ? '10px' : '13px'};font-weight:bold;border:2.5px solid white;box-shadow:0 0 12px ${glow};animation:cp-pulse 1.5s ease-in-out infinite;z-index:1;">
+          ${label}
+        </div>
+        <style>
+          @keyframes cp-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+          @keyframes cp-ring{0%,100%{transform:scale(1);opacity:0.15}50%{transform:scale(1.3);opacity:0}}
+        </style>
       </div>`;
     }
     if (cp.is_finish) {
-      return `<div style="width:32px;height:32px;border-radius:50%;background:#F44336;display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:bold;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.25);">F</div>`;
-    }
-    if (isNear) {
-      return `<div style="width:32px;height:32px;border-radius:50%;background:#000;display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:bold;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);animation:cp-pulse 1.5s ease-in-out infinite;">
-        <style>@keyframes cp-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}</style>
-        ${displayOrder}
-      </div>`;
+      return `<div style="width:36px;height:36px;border-radius:50%;background:#F44336;display:flex;align-items:center;justify-content:center;color:white;font-size:10px;font-weight:bold;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.25);">종료</div>`;
     }
     return `<div style="width:32px;height:32px;border-radius:50%;background:white;display:flex;align-items:center;justify-content:center;color:black;font-size:12px;font-weight:bold;border:2px solid black;box-shadow:0 2px 6px rgba(0,0,0,0.15);">${displayOrder}</div>`;
   }
@@ -502,6 +516,8 @@ class MapStore {
             this.locationMarker = new window.naver.maps.Marker({
               map: this.map!,
               position: latLng,
+              clickable: false,
+              zIndex: 50,
               icon: {
                 content: this._buildLocationMarkerContent(),
                 anchor: new window.naver.maps.Point(30, 30),

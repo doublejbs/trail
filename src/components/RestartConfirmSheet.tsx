@@ -67,7 +67,7 @@ export function RestartConfirmSheet({ open, onConfirm, onCancel }: Props) {
           {/* Text */}
           <div className="text-center mb-6 px-2">
             <p className="text-[18px] font-extrabold text-black tracking-tight mb-1.5">
-              기록을 삭제할까요?
+              기록을 초기화할까요?
             </p>
             <p className="text-[14px] text-black/40 font-medium leading-snug">
               현재까지의 기록이 모두 삭제되고<br />처음부터 다시 시작됩니다.
@@ -80,7 +80,7 @@ export function RestartConfirmSheet({ open, onConfirm, onCancel }: Props) {
               onClick={onConfirm}
               className="w-full py-3.5 rounded-2xl text-[15px] font-bold bg-black text-white active:scale-[0.98] transition-transform"
             >
-              재시작
+              초기화
             </button>
             <button
               onClick={onCancel}

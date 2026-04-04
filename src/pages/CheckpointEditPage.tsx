@@ -26,6 +26,8 @@ export const CheckpointEditPage = observer(() => {
 
   const markersRef = useRef<naver.maps.Marker[]>([]);
   const circlesRef = useRef<naver.maps.Circle[]>([]);
+  const pendingMarkerRef = useRef<naver.maps.Marker | null>(null);
+  const pendingCircleRef = useRef<naver.maps.Circle | null>(null);
 
   const routePoints = useMemo(
     () => (gpxText ? parseGpxPoints(gpxText) : []),
@@ -103,7 +105,12 @@ export const CheckpointEditPage = observer(() => {
     });
   }, [mapStore.map, store.checkpoints]);
 
-  // 지도 클릭 → 새 체크포인트 스냅
+  // 지도 클릭 → 새 체크포인트 or 수정 중 위치 변경
+  const editingCpRef = useRef(editingCp);
+  editingCpRef.current = editingCp;
+  const cpRadiusRef = useRef(cpRadius);
+  cpRadiusRef.current = cpRadius;
+
   useEffect(() => {
     if (!mapStore.map) return;
     const listener = window.naver.maps.Event.addListener(mapStore.map, 'click', (e: naver.maps.PointerEvent) => {
@@ -111,11 +118,21 @@ export const CheckpointEditPage = observer(() => {
       const coord = e.coord as naver.maps.LatLng;
       const snap = snapToRoute(coord.lat(), coord.lng(), routePoints);
       if (!snap) return;
-      setPendingSnap(snap);
-      setEditingCp(null);
-      setCpName('');
-      setCpRadius('30');
-      setShowSheet(true);
+
+      if (editingCpRef.current) {
+        // 수정 중이면 위치만 변경
+        const r = parseInt(cpRadiusRef.current, 10) || 30;
+        setPendingSnap(snap);
+        showPendingMarker(snap.lat, snap.lng, r);
+      } else {
+        // 새 체크포인트
+        setPendingSnap(snap);
+        setEditingCp(null);
+        setCpName('');
+        setCpRadius('30');
+        showPendingMarker(snap.lat, snap.lng, 30);
+        setShowSheet(true);
+      }
     });
     return () => { window.naver.maps.Event.removeListener(listener); };
   }, [mapStore.map, routePoints]);
@@ -125,6 +142,42 @@ export const CheckpointEditPage = observer(() => {
     circlesRef.current.forEach((c) => c.setMap(null));
     markersRef.current = [];
     circlesRef.current = [];
+  }
+
+  function clearPendingMarker() {
+    pendingMarkerRef.current?.setMap(null);
+    pendingMarkerRef.current = null;
+    pendingCircleRef.current?.setMap(null);
+    pendingCircleRef.current = null;
+  }
+
+  function showPendingMarker(lat: number, lng: number, radius: number) {
+    if (!mapStore.map) return;
+    const position = new window.naver.maps.LatLng(lat, lng);
+
+    clearPendingMarker();
+
+    pendingMarkerRef.current = new window.naver.maps.Marker({
+      map: mapStore.map,
+      position,
+      icon: {
+        content: `<div style="width:32px;height:32px;border-radius:50%;background:black;display:flex;align-items:center;justify-content:center;color:white;font-size:14px;font-weight:bold;border:2px dashed white;box-shadow:0 2px 8px rgba(0,0,0,0.3);opacity:0.7;">+</div>`,
+        anchor: new window.naver.maps.Point(16, 16),
+      },
+      zIndex: 200,
+    });
+
+    pendingCircleRef.current = new window.naver.maps.Circle({
+      map: mapStore.map,
+      center: position,
+      radius,
+      strokeColor: '#000000',
+      strokeOpacity: 0.4,
+      strokeWeight: 1.5,
+      strokeStyle: 'dash',
+      fillColor: '#000000',
+      fillOpacity: 0.08,
+    });
   }
 
   function createCheckpointMarkerHtml(cp: Checkpoint, index: number): string {
@@ -157,6 +210,7 @@ export const CheckpointEditPage = observer(() => {
     setShowSheet(false);
     setEditingCp(null);
     setPendingSnap(null);
+    clearPendingMarker();
   };
 
   const handleDelete = async () => {
@@ -187,7 +241,7 @@ export const CheckpointEditPage = observer(() => {
     <div className="absolute inset-0 flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <NavigationBar
         title="체크포인트 편집"
-        onBack={() => navigate(`/group/${id}/settings`)}
+        onBack={() => navigate(-1)}
       />
       <div className="flex-1 relative overflow-hidden">
         <div ref={mapRef} className="absolute inset-0 w-full h-full" />
@@ -229,7 +283,13 @@ export const CheckpointEditPage = observer(() => {
                   type="number"
                   min={1}
                   value={cpRadius}
-                  onChange={(e) => setCpRadius(e.target.value)}
+                  onChange={(e) => {
+                    setCpRadius(e.target.value);
+                    const r = parseInt(e.target.value, 10);
+                    if (pendingSnap && !isNaN(r) && r > 0) {
+                      showPendingMarker(pendingSnap.lat, pendingSnap.lng, r);
+                    }
+                  }}
                   className="w-full bg-black/[0.03] border border-black/[0.06] rounded-xl px-4 py-2.5 text-[14px] outline-none focus:border-black/20"
                 />
               </div>
@@ -243,7 +303,7 @@ export const CheckpointEditPage = observer(() => {
                   </button>
                 )}
                 <button
-                  onClick={() => { setShowSheet(false); setEditingCp(null); setPendingSnap(null); }}
+                  onClick={() => { setShowSheet(false); setEditingCp(null); setPendingSnap(null); clearPendingMarker(); }}
                   className="flex-1 py-2.5 rounded-xl border border-black/10 text-[13px] font-semibold text-black/50 active:bg-black/[0.03] transition-colors"
                 >
                   취소

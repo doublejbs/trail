@@ -11,6 +11,7 @@ import { MapStore } from '../stores/MapStore';
 import { NavigationBar } from '../components/NavigationBar';
 import { ElevationChart } from '../components/ElevationChart';
 import { supabase } from '../lib/supabase';
+import { parseGpxCoords, computeDistanceM } from '../lib/gpx';
 import type { Course } from '../types/course';
 
 class QuickGroupCreateStore {
@@ -55,6 +56,35 @@ class QuickGroupCreateStore {
       runInAction(() => { this.submitting = false; });
       toast.error('그룹 생성에 실패했습니다');
       return;
+    }
+
+    // 종료 체크포인트 자동 생성
+    try {
+      const { data: urlData } = await supabase.storage
+        .from('course-gpx')
+        .createSignedUrl(this.course.gpx_path, 60);
+      if (urlData?.signedUrl) {
+        const resp = await fetch(urlData.signedUrl);
+        if (resp.ok) {
+          const gpxText = await resp.text();
+          const coords = parseGpxCoords(gpxText);
+          if (coords && coords.length >= 2) {
+            const lastCoord = coords[coords.length - 1];
+            const totalDist = computeDistanceM(coords);
+            await supabase.from('checkpoints').insert({
+              group_id: groupId,
+              name: '종료',
+              lat: lastCoord.lat,
+              lng: lastCoord.lon,
+              radius_m: 30,
+              sort_order: totalDist,
+              is_finish: true,
+            });
+          }
+        }
+      }
+    } catch {
+      // 체크포인트 생성 실패해도 그룹 생성은 성공으로 처리
     }
 
     runInAction(() => { this.submitting = false; });

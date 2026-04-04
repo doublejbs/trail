@@ -4,6 +4,7 @@ import { observer } from 'mobx-react-lite';
 import { NavigationBar } from '../components/NavigationBar';
 import { RestartConfirmSheet } from '../components/RestartConfirmSheet';
 import { CountdownOverlay } from '../components/CountdownOverlay';
+import { FinishCelebration } from '../components/FinishCelebration';
 import { runInAction, autorun, reaction } from 'mobx';
 import { Button } from '@/components/ui/button';
 import { Crosshair, Trophy, X, Settings, TrendingUp } from 'lucide-react';
@@ -501,6 +502,14 @@ export const GroupMapPage = observer(() => {
       <div className="fixed inset-0 z-[9999] bg-black flex items-center justify-center">
         <div className="w-7 h-7 border-3 border-white/20 border-t-white rounded-full animate-spin" />
       </div>
+    )}
+
+    {trackingStore.isFinished && (
+      <FinishCelebration
+        elapsedTime={trackingStore.formattedTime}
+        distanceKm={`${(trackingStore.distanceMeters / 1000).toFixed(1)}km`}
+        onClose={() => runInAction(() => { trackingStore.isFinished = false; })}
+      />
     )}
     </>
   );
