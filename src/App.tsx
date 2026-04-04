@@ -15,6 +15,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { HistoryPage } from './pages/HistoryPage';
 import { InvitePage } from './pages/InvitePage';
 import { SetupProfilePage } from './pages/SetupProfilePage';
+import { CheckpointEditPage } from './pages/CheckpointEditPage';
 
 export default function App() {
   return (
@@ -41,6 +42,7 @@ export default function App() {
           <Route path="group/new" element={<GroupCreatePage />} />
           <Route path="group/:id" element={<GroupMapPage />} />
           <Route path="group/:id/settings" element={<GroupSettingsPage />} />
+          <Route path="group/:id/checkpoints" element={<CheckpointEditPage />} />
           <Route path="course" element={<CoursePage />} />
           <Route path="course/new" element={<CourseUploadPage />} />
           <Route path="course/:id" element={<CourseDetailPage />} />
