@@ -2,7 +2,7 @@ import { makeAutoObservable, runInAction } from 'mobx';
 import type { NavigateFunction } from 'react-router-dom';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
-import { parseGpxCoords } from '../lib/gpx';
+import { parseGpxCoords, computeDistanceM } from '../lib/gpx';
 import { generateThumbnail } from '../lib/thumbnail';
 import type { Course } from '../types/course';
 
@@ -169,6 +169,42 @@ class GroupCreateStore {
       return;
     }
 
+    // 종료 체크포인트 자동 생성
+    try {
+      let gpxText: string | null = null;
+      if (this.sourceMode === 'file' && this.file) {
+        gpxText = await this.file.text();
+      } else if (this.sourceMode === 'course') {
+        const course = this.courses.find((c) => c.id === this.selectedCourseId);
+        if (course) {
+          const { data: urlData } = await supabase.storage
+            .from('course-gpx')
+            .createSignedUrl(course.gpx_path, 60);
+          if (urlData?.signedUrl) {
+            const resp = await fetch(urlData.signedUrl);
+            if (resp.ok) gpxText = await resp.text();
+          }
+        }
+      }
+      if (gpxText) {
+        const coords = parseGpxCoords(gpxText);
+        if (coords && coords.length >= 2) {
+          const lastCoord = coords[coords.length - 1];
+          const totalDist = computeDistanceM(coords);
+          await supabase.from('checkpoints').insert({
+            group_id: groupId,
+            name: '종료',
+            lat: lastCoord.lat,
+            lng: lastCoord.lon,
+            radius_m: 30,
+            sort_order: totalDist,
+            is_finish: true,
+          });
+        }
+      }
+    } catch {
+      // 체크포인트 생성 실패해도 그룹 생성은 성공으로 처리
+    }
 
     runInAction(() => { this.submitting = false; });
     this.navigate('/group');
