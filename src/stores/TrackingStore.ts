@@ -2,6 +2,7 @@ import { makeAutoObservable, runInAction } from 'mobx';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
 import { haversineMeters, maxRouteProgress } from '../utils/routeProjection';
+import type { Checkpoint } from '../types/checkpoint';
 
 class TrackingStore {
   public isTracking: boolean = false;
@@ -17,6 +18,9 @@ class TrackingStore {
   public elapsedSeconds: number = 0;
 
   public displayName: string | null = null;
+  public checkpoints: Checkpoint[] = [];
+  public visitedCheckpointIds: Set<string> = new Set();
+  public nearCheckpointId: string | null = null;
   private timerId: ReturnType<typeof setInterval> | null = null;
   private _lastBroadcastLat: number | null = null;
   private _lastBroadcastLng: number | null = null;
@@ -38,6 +42,10 @@ class TrackingStore {
 
   public setRoutePoints(points: { lat: number; lng: number }[]): void {
     this.routePoints = points;
+  }
+
+  public setCheckpoints(checkpoints: Checkpoint[]): void {
+    this.checkpoints = checkpoints;
   }
 
   public get formattedTime(): string {
@@ -81,6 +89,18 @@ class TrackingStore {
       });
 
       this._startTimer();
+
+      // 체크포인트 통과 상태 복원
+      const { data: visits } = await supabase
+        .from('checkpoint_visits')
+        .select('checkpoint_id')
+        .eq('tracking_session_id', data.id);
+
+      if (visits && visits.length > 0) {
+        runInAction(() => {
+          this.visitedCheckpointIds = new Set(visits.map((v) => v.checkpoint_id));
+        });
+      }
     } catch {
       // 복원 실패 시 초기 상태 유지
     } finally {
@@ -172,12 +192,26 @@ class TrackingStore {
 
   public async restart(): Promise<void> {
     this._clearTimer();
+
+    // sessionId가 있으면 해당 세션 종료
     if (this._sessionId) {
       await supabase
         .from('tracking_sessions')
-        .delete()
+        .update({ status: 'completed' })
         .eq('id', this._sessionId);
     }
+
+    // sessionId 없이 복원된 경우 대비: 이 그룹의 모든 active 세션 종료
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase
+        .from('tracking_sessions')
+        .update({ status: 'completed' })
+        .eq('user_id', user.id)
+        .eq('group_id', this.groupId)
+        .in('status', ['active', 'paused']);
+    }
+
     runInAction(() => {
       this.isTracking = false;
       this._sessionId = null;
@@ -189,6 +223,8 @@ class TrackingStore {
       this.latestLat = null;
       this.latestLng = null;
       this.saveError = null;
+      this.visitedCheckpointIds = new Set();
+      this.nearCheckpointId = null;
     });
   }
 
@@ -216,6 +252,7 @@ class TrackingStore {
   public setLatestPosition(lat: number, lng: number): void {
     this.latestLat = lat;
     this.latestLng = lng;
+    this._updateNearCheckpoint(lat, lng);
     this._maybeBroadcast(lat, lng);
   }
 
@@ -279,6 +316,7 @@ class TrackingStore {
         maxRouteMeters: this.maxRouteMeters,
         lat,
         lng,
+        checkpointsVisited: this.visitedCheckpointIds.size,
       },
     });
   }
@@ -295,6 +333,7 @@ class TrackingStore {
     this.latestLat = lat;
     this.latestLng = lng;
     this.maxRouteMeters = maxRouteProgress(this.points, this.routePoints);
+    this._updateNearCheckpoint(lat, lng);
   }
 
   private _startTimer(): void {
@@ -312,6 +351,53 @@ class TrackingStore {
     if (this.timerId !== null) {
       clearInterval(this.timerId);
       this.timerId = null;
+    }
+  }
+
+  private _updateNearCheckpoint(lat: number, lng: number): void {
+    let nearest: { id: string; dist: number } | null = null;
+    for (const cp of this.checkpoints) {
+      if (this.visitedCheckpointIds.has(cp.id)) continue;
+      const dist = haversineMeters(lat, lng, cp.lat, cp.lng);
+      if (dist <= cp.radius_m && (!nearest || dist < nearest.dist)) {
+        nearest = { id: cp.id, dist };
+      }
+    }
+    this.nearCheckpointId = nearest?.id ?? null;
+  }
+
+  public async visitCheckpoint(checkpointId: string): Promise<void> {
+    if (this.nearCheckpointId !== checkpointId) return;
+    if (!this._sessionId || !this._userId) return;
+    if (this.visitedCheckpointIds.has(checkpointId)) return;
+
+    const { error } = await supabase.from('checkpoint_visits').insert({
+      user_id: this._userId,
+      checkpoint_id: checkpointId,
+      tracking_session_id: this._sessionId,
+    });
+
+    if (error) return;
+
+    runInAction(() => {
+      this.visitedCheckpointIds = new Set([...this.visitedCheckpointIds, checkpointId]);
+      this.nearCheckpointId = null;
+    });
+
+    // 브로드캐스트에 체크포인트 수 포함하여 즉시 전송
+    if (this._channel && this._userId && this.latestLat !== null && this.latestLng !== null) {
+      void this._channel.send({
+        type: 'broadcast',
+        event: 'progress',
+        payload: {
+          userId: this._userId,
+          displayName: this.displayName,
+          maxRouteMeters: this.maxRouteMeters,
+          lat: this.latestLat,
+          lng: this.latestLng,
+          checkpointsVisited: this.visitedCheckpointIds.size,
+        },
+      });
     }
   }
 
