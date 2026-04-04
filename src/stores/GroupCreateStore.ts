@@ -91,6 +91,8 @@ class GroupCreateStore {
     let gpxPath: string;
     let gpxBucket: string;
     let thumbnailPath: string | null = null;
+    let distanceM: number | null = null;
+    let elevationGainM: number | null = null;
 
     if (this.sourceMode === 'course') {
       const course = this.courses.find((c) => c.id === this.selectedCourseId);
@@ -106,6 +108,8 @@ class GroupCreateStore {
       gpxBucket = 'course-gpx';
       // 코스의 썸네일을 그대로 사용
       thumbnailPath = course.thumbnail_path;
+      distanceM = course.distance_m;
+      elevationGainM = course.elevation_gain_m;
     } else {
       const path = `${userId}/${groupId}.gpx`;
       const { error: uploadError } = await supabase.storage
@@ -152,6 +156,8 @@ class GroupCreateStore {
         gpx_path: gpxPath,
         gpx_bucket: gpxBucket,
         thumbnail_path: thumbnailPath,
+        distance_m: distanceM,
+        elevation_gain_m: elevationGainM,
       });
 
     if (insertError) {
@@ -162,6 +168,7 @@ class GroupCreateStore {
       toast.error(this.error!);
       return;
     }
+
 
     runInAction(() => { this.submitting = false; });
     this.navigate('/group');

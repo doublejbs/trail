@@ -9,4 +9,15 @@ export interface Group {
   max_members: number | null;
   period_started_at: string | null;
   period_ended_at: string | null;
+  distance_m: number | null;
+  elevation_gain_m: number | null;
+  difficulty: string | null;
+  member_count?: number;
+  members?: GroupMemberPreview[];
 }
+
+export interface GroupMemberPreview {
+  user_id: string;
+  avatar_url: string | null;
+}
+

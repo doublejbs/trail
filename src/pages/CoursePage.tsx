@@ -104,25 +104,20 @@ export const CoursePage = observer(() => {
       </div>
 
       {/* FAB */}
-      <div className="absolute right-5 bottom-4">
+      <div className="absolute right-5 bottom-4 flex flex-col items-center gap-3">
+        <button
+          onClick={() => setMapOpen(true)}
+          aria-label="지도 보기"
+          className="w-14 h-14 bg-white text-black border border-black/[0.06] rounded-full flex items-center justify-center shadow-lg shadow-black/10 active:scale-95 transition-transform"
+        >
+          <Map size={20} strokeWidth={1.8} />
+        </button>
         <button
           onClick={() => navigate('/course/new')}
           aria-label="코스 업로드"
           className="w-14 h-14 bg-black text-white rounded-full flex items-center justify-center shadow-lg shadow-black/20 active:scale-95 transition-transform"
         >
           <Plus size={24} strokeWidth={2.2} />
-        </button>
-      </div>
-
-      {/* 지도 버튼 */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
-        <button
-          onClick={() => setMapOpen(true)}
-          aria-label="지도 보기"
-          className="flex items-center gap-2 px-5 py-3 bg-black text-white rounded-full text-[14px] font-semibold shadow-lg shadow-black/20 active:scale-95 transition-transform"
-        >
-          <Map size={16} />
-          지도
         </button>
       </div>
 
