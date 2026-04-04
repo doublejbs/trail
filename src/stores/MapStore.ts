@@ -1,4 +1,5 @@
 import { makeAutoObservable, observable, runInAction } from "mobx";
+import type { Checkpoint } from '../types/checkpoint';
 
 function createPinHtml(color: string): string {
   return `<div style="width:20px;height:20px;border-radius:50% 50% 50% 0;background:${color};transform:rotate(-45deg);box-shadow:0 2px 6px rgba(0,0,0,0.4);border:2px solid white;"></div>`;
@@ -20,6 +21,9 @@ class MapStore {
   private lastPosition: { latitude: number; longitude: number } | null = null;
   private locationAvatarUrl: string | null = null;
   private _memberMarkers: Map<string, naver.maps.Marker> = new Map();
+  private _checkpointMarkers: Map<string, naver.maps.Marker> = new Map();
+  private _checkpointCircles: Map<string, naver.maps.Circle> = new Map();
+  private _onCheckpointTap: ((checkpointId: string) => void) | null = null;
   private _logoEl: HTMLDivElement | null = null;
 
   public constructor() {
@@ -282,10 +286,136 @@ class MapStore {
     this._memberMarkers.clear();
   }
 
+  public setOnCheckpointTap(cb: ((checkpointId: string) => void) | null): void {
+    this._onCheckpointTap = cb;
+  }
+
+  public drawCheckpoints(
+    checkpoints: Checkpoint[],
+    visitedIds: Set<string>,
+    nearId: string | null,
+  ): void {
+    if (!this.map) return;
+
+    // 기존 endMarker 숨기기 (종료 체크포인트가 대체)
+    if (checkpoints.some((cp) => cp.is_finish)) {
+      this.endMarker?.setMap(null);
+    }
+
+    // 체크포인트별 순서 번호 (is_finish 제외)
+    let order = 0;
+    for (const cp of checkpoints) {
+      const isVisited = visitedIds.has(cp.id);
+      const isNear = nearId === cp.id;
+      if (!cp.is_finish) order++;
+      const displayOrder = cp.is_finish ? -1 : order;
+
+      const existing = this._checkpointMarkers.get(cp.id);
+      const position = new window.naver.maps.LatLng(cp.lat, cp.lng);
+
+      if (existing) {
+        existing.setPosition(position);
+        existing.setIcon({
+          content: this._buildCheckpointHtml(cp, displayOrder, isVisited, isNear),
+          anchor: new window.naver.maps.Point(16, 16),
+        });
+      } else {
+        const marker = new window.naver.maps.Marker({
+          map: this.map,
+          position,
+          icon: {
+            content: this._buildCheckpointHtml(cp, displayOrder, isVisited, isNear),
+            anchor: new window.naver.maps.Point(16, 16),
+          },
+          zIndex: 100,
+        });
+        window.naver.maps.Event.addListener(marker, 'click', () => {
+          this._onCheckpointTap?.(cp.id);
+        });
+        this._checkpointMarkers.set(cp.id, marker);
+      }
+
+      // 반경 원
+      const existingCircle = this._checkpointCircles.get(cp.id);
+      const circleColor = cp.is_finish ? '#F44336' : isNear ? '#000000' : '#000000';
+      const circleOpacity = isNear ? 0.12 : 0.05;
+      if (existingCircle) {
+        existingCircle.setCenter(position);
+        existingCircle.setRadius(cp.radius_m);
+        existingCircle.setOptions({
+          center: position,
+          radius: cp.radius_m,
+          fillColor: circleColor,
+          fillOpacity: circleOpacity,
+          strokeColor: circleColor,
+          strokeOpacity: isNear ? 0.4 : 0.2,
+        });
+      } else {
+        const circle = new window.naver.maps.Circle({
+          map: this.map,
+          center: position,
+          radius: cp.radius_m,
+          strokeColor: circleColor,
+          strokeOpacity: 0.2,
+          strokeWeight: 1,
+          fillColor: circleColor,
+          fillOpacity: circleOpacity,
+        });
+        this._checkpointCircles.set(cp.id, circle);
+      }
+    }
+
+    // 삭제된 체크포인트 정리
+    const currentIds = new Set(checkpoints.map((cp) => cp.id));
+    for (const [cpId, marker] of this._checkpointMarkers) {
+      if (!currentIds.has(cpId)) {
+        marker.setMap(null);
+        this._checkpointMarkers.delete(cpId);
+      }
+    }
+    for (const [cpId, circle] of this._checkpointCircles) {
+      if (!currentIds.has(cpId)) {
+        circle.setMap(null);
+        this._checkpointCircles.delete(cpId);
+      }
+    }
+  }
+
+  private _buildCheckpointHtml(
+    cp: Checkpoint,
+    displayOrder: number,
+    isVisited: boolean,
+    isNear: boolean,
+  ): string {
+    if (isVisited) {
+      return `<div style="width:32px;height:32px;border-radius:50%;background:#22C55E;display:flex;align-items:center;justify-content:center;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.2);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>`;
+    }
+    if (cp.is_finish) {
+      return `<div style="width:32px;height:32px;border-radius:50%;background:#F44336;display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:bold;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.25);">F</div>`;
+    }
+    if (isNear) {
+      return `<div style="width:32px;height:32px;border-radius:50%;background:#000;display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:bold;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);animation:cp-pulse 1.5s ease-in-out infinite;">
+        <style>@keyframes cp-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}</style>
+        ${displayOrder}
+      </div>`;
+    }
+    return `<div style="width:32px;height:32px;border-radius:50%;background:white;display:flex;align-items:center;justify-content:center;color:black;font-size:12px;font-weight:bold;border:2px solid black;box-shadow:0 2px 6px rgba(0,0,0,0.15);">${displayOrder}</div>`;
+  }
+
+  public clearCheckpoints(): void {
+    this._checkpointMarkers.forEach((m) => m.setMap(null));
+    this._checkpointMarkers.clear();
+    this._checkpointCircles.forEach((c) => c.setMap(null));
+    this._checkpointCircles.clear();
+  }
+
   public destroy(): void {
     this.stopWatchingLocation();
     this.clearGpxRoute();
     this.clearMemberMarkers();
+    this.clearCheckpoints();
     this._logoEl?.remove();
     this._logoEl = null;
     document.head.querySelector('style[data-map-logo-hide]')?.remove();
@@ -337,12 +467,15 @@ class MapStore {
           100% { transform: scale(1.7); opacity: 0; }
         }
       </style>
-      <div style="position:relative;width:60px;height:60px;display:flex;align-items:center;justify-content:center;">
-        <div style="position:absolute;width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,0.15);animation:loc-pulse 2s ease-out infinite;z-index:0;"></div>
-        <div style="position:absolute;width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,0.1);animation:loc-pulse2 2s ease-out 0.4s infinite;z-index:0;"></div>
-        <div style="position:relative;width:36px;height:36px;border-radius:50%;overflow:hidden;border:2.5px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.25);flex-shrink:0;z-index:1;background:white;">
-          ${inner}
+      <div style="position:relative;width:60px;height:76px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;">
+        <div style="position:relative;width:60px;height:60px;display:flex;align-items:center;justify-content:center;">
+          <div style="position:absolute;width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,0.15);animation:loc-pulse 2s ease-out infinite;z-index:0;"></div>
+          <div style="position:absolute;width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,0.1);animation:loc-pulse2 2s ease-out 0.4s infinite;z-index:0;"></div>
+          <div style="position:relative;width:36px;height:36px;border-radius:50%;overflow:hidden;border:2.5px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.25);flex-shrink:0;z-index:1;background:white;">
+            ${inner}
+          </div>
         </div>
+        <div style="margin-top:-2px;font-size:11px;font-weight:700;color:#222;text-align:center;z-index:1;text-shadow:0 0 3px white,0 0 3px white,0 0 3px white;white-space:nowrap;">내 위치</div>
       </div>`;
   }
 
