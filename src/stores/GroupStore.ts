@@ -2,24 +2,34 @@ import { makeAutoObservable, runInAction } from 'mobx';
 import { supabase } from '../lib/supabase';
 import type { Group, GroupMemberPreview } from '../types/group';
 
+export type GroupTab = 'joined' | 'explore';
+export type GroupFilter = 'all' | 'active' | 'mine' | 'ended';
+
 class GroupStore {
   public groups: Group[] = [];
   public loading: boolean = true;
+  public membersLoading: boolean = true;
   public error: boolean = false;
   public currentUserId: string | null = null;
-  public onlyOwned: boolean = false;
-  public activeTrackingGroupIds: string[] = [];
+  public tab: GroupTab = 'joined';
+  public filter: GroupFilter = 'all';
+  public joinedGroupIds: Set<string> = new Set();
 
   public constructor() {
     makeAutoObservable(this);
   }
 
-  public toggleOnlyOwned(): void {
-    this.onlyOwned = !this.onlyOwned;
+  public setTab(t: GroupTab): void {
+    this.tab = t;
+  }
+
+  public setFilter(f: GroupFilter): void {
+    this.filter = f;
   }
 
   public async load(): Promise<void> {
     this.loading = true;
+    this.membersLoading = true;
     this.error = false;
 
     const [{ data: userData }, { data, error }] = await Promise.all([
@@ -32,21 +42,20 @@ class GroupStore {
 
     const userId = userData?.user?.id ?? null;
 
-    let activeGroupIds: string[] = [];
+    let joinedIds = new Set<string>();
     if (userId) {
-      const { data: sessions } = await supabase
-        .from('tracking_sessions')
+      const { data: memberships } = await supabase
+        .from('group_members')
         .select('group_id')
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
-      activeGroupIds = (sessions ?? []).map((s) => s.group_id);
+        .eq('user_id', userId);
+      joinedIds = new Set((memberships ?? []).map((m) => m.group_id));
     }
 
     if (error) {
       runInAction(() => {
         this.error = true;
         this.loading = false;
+        this.membersLoading = false;
       });
       return;
     }
@@ -56,12 +65,23 @@ class GroupStore {
       return { ...g, member_count: counts?.[0]?.count ?? 0 } as Group;
     });
 
-    // 각 그룹의 멤버 프로필(아바타) 로드 — 최대 3명씩
+    // 1단계: 그룹 목록 먼저 표시
+    runInAction(() => {
+      this.groups = groups;
+      this.currentUserId = userId;
+      this.joinedGroupIds = joinedIds;
+      this.loading = false;
+    });
+
+    // 2단계: 멤버 아바타 비동기 로드
+    void this._loadMembers(groups);
+  }
+
+  private async _loadMembers(groups: Group[]): Promise<void> {
     const groupIds = groups.map((g) => g.id);
     const memberMap = new Map<string, GroupMemberPreview[]>();
 
     if (groupIds.length > 0) {
-      // 1) 멤버 목록 가져오기
       const { data: membersData } = await supabase
         .from('group_members')
         .select('group_id, user_id')
@@ -69,7 +89,6 @@ class GroupStore {
         .order('joined_at', { ascending: true });
 
       if (membersData && membersData.length > 0) {
-        // 그룹별 멤버 분류 (최대 3명)
         const allUserIds = new Set<string>();
         for (const m of membersData) {
           const list = memberMap.get(m.group_id) ?? [];
@@ -80,7 +99,6 @@ class GroupStore {
           memberMap.set(m.group_id, list);
         }
 
-        // 2) 프로필(아바타) 별도 조회
         const { data: profilesData } = await supabase
           .from('profiles')
           .select('id, avatar_path')
@@ -93,7 +111,6 @@ class GroupStore {
           }
         }
 
-        // 3) 아바타 signed URL 일괄 생성
         const avatarPaths: string[] = [];
         profileMap.forEach((path) => {
           if (path) avatarPaths.push(path);
@@ -113,7 +130,6 @@ class GroupStore {
           }
         }
 
-        // 4) 멤버에 아바타 URL 매핑
         memberMap.forEach((members) => {
           for (const mem of members) {
             const path = profileMap.get(mem.user_id);
@@ -123,16 +139,12 @@ class GroupStore {
       }
     }
 
-    const enrichedGroups = groups.map((g) => ({
-      ...g,
-      members: memberMap.get(g.id) ?? [],
-    }));
-
     runInAction(() => {
-      this.groups = enrichedGroups;
-      this.currentUserId = userId;
-      this.activeTrackingGroupIds = activeGroupIds;
-      this.loading = false;
+      this.groups = this.groups.map((g) => ({
+        ...g,
+        members: memberMap.get(g.id) ?? g.members ?? [],
+      }));
+      this.membersLoading = false;
     });
   }
 }

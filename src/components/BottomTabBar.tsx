@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Users, Compass } from 'lucide-react';
+import { Users, Compass, Flame } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 interface Tab {
@@ -13,6 +13,11 @@ const TABS: Tab[] = [
     path: '/group',
     label: '그룹',
     icon: (a) => <Users size={22} strokeWidth={a ? 2.2 : 1.6} />,
+  },
+  {
+    path: '/my',
+    label: '참가중',
+    icon: (a) => <Flame size={22} strokeWidth={a ? 2.2 : 1.6} />,
   },
   {
     path: '/course',

@@ -10,6 +10,7 @@ import { GroupSettingsPage } from './pages/GroupSettingsPage';
 import { CoursePage } from './pages/CoursePage';
 import { CourseUploadPage } from './pages/CourseUploadPage';
 import { CourseDetailPage } from './pages/CourseDetailPage';
+import { MyGroupsPage } from './pages/MyGroupsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { HistoryPage } from './pages/HistoryPage';
 import { InvitePage } from './pages/InvitePage';
@@ -35,6 +36,7 @@ export default function App() {
           }
         >
           <Route index element={<Navigate to="/group" replace />} />
+          <Route path="my" element={<MyGroupsPage />} />
           <Route path="group" element={<GroupPage />} />
           <Route path="group/new" element={<GroupCreatePage />} />
           <Route path="group/:id" element={<GroupMapPage />} />
