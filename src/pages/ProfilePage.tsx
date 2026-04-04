@@ -10,6 +10,7 @@ export const ProfilePage = observer(() => {
   const [profileStore] = useState(() => new ProfileStore());
   const [inputValue, setInputValue] = useState('');
   const [editing, setEditing] = useState(false);
+  const [avatarLoaded, setAvatarLoaded] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -19,6 +20,9 @@ export const ProfilePage = observer(() => {
       setInputValue(profileStore.displayName);
     });
   }, [profileStore]);
+  useEffect(() => {
+    setAvatarLoaded(false);
+  }, [profileStore.avatarUrl]);
 
   const handleEdit = () => {
     setEditing(true);
@@ -64,19 +68,25 @@ export const ProfilePage = observer(() => {
               aria-label="프로필 사진 변경"
               className="relative w-16 h-16 rounded-full shrink-0 active:opacity-75 transition-opacity"
             >
-              {profileStore.avatarUrl ? (
+              {profileStore.avatarUrl && (
                 <img
                   src={profileStore.avatarUrl}
                   alt="프로필"
-                  className="w-full h-full rounded-full object-cover"
+                  onLoad={() => setAvatarLoaded(true)}
+                  className={`absolute inset-0 w-full h-full rounded-full object-cover transition-opacity duration-200 ${avatarLoaded ? 'opacity-100' : 'opacity-0'}`}
                 />
-              ) : (
+              )}
+              {profileStore.avatarUrl && !avatarLoaded ? (
+                <div className="w-full h-full rounded-full bg-black/[0.04] flex items-center justify-center">
+                  <div className="w-4 h-4 border-2 border-black/15 border-t-black/40 rounded-full animate-spin" />
+                </div>
+              ) : !profileStore.avatarUrl ? (
                 <div className="w-full h-full rounded-full bg-black/[0.06] flex items-center justify-center">
                   <span className="text-[24px] font-bold text-black/20">
                     {inputValue ? inputValue[0]?.toUpperCase() : '?'}
                   </span>
                 </div>
-              )}
+              ) : null}
               {/* Upload overlay */}
               {profileStore.uploadingAvatar ? (
                 <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center">

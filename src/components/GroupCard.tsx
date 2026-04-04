@@ -107,7 +107,10 @@ function MemberAvatars({ group, loading }: { group: Group; loading?: boolean }) 
 export function GroupCard({ group, onClick, membersLoading }: { group: Group; onClick: () => void; membersLoading?: boolean }) {
   const ref = useRef<HTMLButtonElement>(null);
   const url = useSignedUrl(group, ref);
+  const [imgLoaded, setImgLoaded] = useState(false);
   const status = getGroupStatus(group);
+
+  const showSpinner = group.thumbnail_path && !imgLoaded;
 
   return (
     <button
@@ -116,11 +119,20 @@ export function GroupCard({ group, onClick, membersLoading }: { group: Group; on
       className="w-full bg-white border border-black/[0.06] rounded-2xl p-4 flex flex-col gap-3 text-left active:bg-black/[0.02] transition-colors"
     >
       <div className="h-44 rounded-xl overflow-hidden bg-black/[0.04] relative">
-        {url ? (
-          <img src={url} alt={group.name} className="w-full h-full object-cover" />
-        ) : group.thumbnail_path ? (
-          <div className="w-full h-full animate-pulse bg-black/[0.06]" />
-        ) : (
+        {url && (
+          <img
+            src={url}
+            alt={group.name}
+            onLoad={() => setImgLoaded(true)}
+            className={`w-full h-full object-cover transition-opacity duration-200 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+          />
+        )}
+        {showSpinner && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-5 h-5 border-2 border-black/15 border-t-black/40 rounded-full animate-spin" />
+          </div>
+        )}
+        {!group.thumbnail_path && (
           <div className="w-full h-full flex items-center justify-center">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M4 18L8 10L12 14L16 6L20 12" stroke="black" strokeOpacity="0.12" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
