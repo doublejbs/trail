@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
 import { toast } from 'sonner';
-import { Copy, Link, UserMinus } from 'lucide-react';
+import { Copy, Link, UserMinus, Play, Square, MapPin } from 'lucide-react';
 import { NavigationBar } from '../components/NavigationBar';
 import { GroupSettingsStore } from '../stores/GroupSettingsStore';
 
@@ -60,6 +60,82 @@ export const GroupSettingsPage = observer(() => {
       />
 
       <div className="px-5 py-6 flex flex-col gap-6">
+        {/* Activity Period Section */}
+        <section className="bg-black/[0.02] rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            {store.isPeriodActive ? (
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            ) : (
+              <div className="w-2 h-2 rounded-full bg-black/20" />
+            )}
+            <h2 className="text-[13px] font-bold text-black/60 uppercase tracking-wide">활동 상태</h2>
+          </div>
+          <p className="text-[13px] text-black/40 mb-3">
+            {store.isPeriodActive ? '활동이 진행 중입니다. 멤버들이 트래킹을 시작할 수 있습니다.' : '활동이 비활성 상태입니다. 시작하면 멤버들이 트래킹할 수 있습니다.'}
+          </p>
+          {store.isPeriodActive ? (
+            <button
+              onClick={() => void store.endPeriod(id)}
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-black/10 text-[13px] font-semibold text-black/50 active:bg-black/[0.03] transition-colors"
+            >
+              <Square size={14} />
+              활동 종료
+            </button>
+          ) : (
+            <button
+              onClick={() => void store.startPeriod(id)}
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-black text-white text-[13px] font-semibold active:bg-black/80 transition-colors"
+            >
+              <Play size={14} />
+              활동 시작
+            </button>
+          )}
+        </section>
+
+        {/* Checkpoint Section */}
+        <section className="bg-black/[0.02] rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <MapPin size={16} className="text-black/40" />
+            <h2 className="text-[13px] font-bold text-black/60 uppercase tracking-wide">체크포인트</h2>
+          </div>
+          {store.checkpoints.length === 0 ? (
+            <p className="text-[13px] text-black/30 mb-3">아직 체크포인트가 없습니다</p>
+          ) : (
+            <div className="bg-white rounded-xl border border-black/[0.06] overflow-hidden mb-3">
+              {store.checkpoints.map((cp, i) => (
+                <div
+                  key={cp.id}
+                  className={`flex items-center gap-3 px-3 py-2.5 ${
+                    i < store.checkpoints.length - 1 ? 'border-b border-black/[0.04]' : ''
+                  }`}
+                >
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
+                    cp.is_finish
+                      ? 'bg-red-500 text-white'
+                      : 'bg-black/[0.06] text-black/50'
+                  }`}>
+                    {cp.is_finish ? 'F' : i + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-medium text-black/70 truncate">{cp.name}</p>
+                    <p className="text-[11px] text-black/30">반경 {cp.radius_m}m</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {!store.isPeriodActive ? (
+            <button
+              onClick={() => navigate(`/group/${id}/checkpoints`)}
+              className="w-full py-2.5 rounded-xl bg-black text-white text-[13px] font-semibold active:bg-black/80 transition-colors"
+            >
+              체크포인트 편집
+            </button>
+          ) : (
+            <p className="text-[11px] text-black/30">활동 중에는 체크포인트를 수정할 수 없습니다</p>
+          )}
+        </section>
+
         {/* Invite Link Section */}
         <section className="bg-black/[0.02] rounded-2xl p-4">
           <div className="flex items-center gap-2 mb-3">
