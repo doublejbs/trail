@@ -3,6 +3,7 @@ import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
 import { NavigationBar } from '../components/NavigationBar';
 import { RestartConfirmSheet } from '../components/RestartConfirmSheet';
+import { CountdownOverlay } from '../components/CountdownOverlay';
 import { runInAction, autorun, reaction } from 'mobx';
 import { Button } from '@/components/ui/button';
 import { Crosshair, Trophy, X, Settings, TrendingUp } from 'lucide-react';
@@ -27,6 +28,11 @@ export const GroupMapPage = observer(() => {
   const [activeTab, setActiveTab] = useState<'map' | 'leaderboard'>('map');
   const [showElevation, setShowElevation] = useState(false);
   const [showRestartConfirm, setShowRestartConfirm] = useState(false);
+  const [showCountdown, setShowCountdown] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [checkpoints, setCheckpoints] = useState<import('../types/checkpoint').Checkpoint[]>([]);
+  const [totalCheckpoints, setTotalCheckpoints] = useState(0);
 
   const routePoints = useMemo(
     () => (store.gpxText ? parseGpxPoints(store.gpxText) : []),
@@ -69,6 +75,9 @@ export const GroupMapPage = observer(() => {
       trackingStore.addPoint(lat, lng);
     });
     void trackingStore.startLocationBroadcast();
+    mapStore.setOnCheckpointTap((cpId) => {
+      void trackingStore.visitCheckpoint(cpId);
+    });
     return () => { mapStore.destroy(); };
   }, [mapStore, trackingStore, store.group]);
 
@@ -95,6 +104,18 @@ export const GroupMapPage = observer(() => {
     initialized.current = true;
 
     void trackingStore.restore();
+    // 체크포인트 로드
+    supabase
+      .from('checkpoints')
+      .select('*')
+      .eq('group_id', id)
+      .order('sort_order', { ascending: true })
+      .then(({ data }) => {
+        const cps = (data ?? []) as import('../types/checkpoint').Checkpoint[];
+        setCheckpoints(cps);
+        setTotalCheckpoints(cps.length);
+        trackingStore.setCheckpoints(cps);
+      });
     void leaderboardStore.load(store.periodStartedAt ?? null);
 
     const admin = store.currentUserId === store.group?.created_by;
@@ -132,6 +153,19 @@ export const GroupMapPage = observer(() => {
     return disposer;
   }, [leaderboardStore, mapStore, store]);
 
+  // 체크포인트 마커 렌더링
+  useEffect(() => {
+    if (checkpoints.length === 0 || !mapStore.map) return;
+    const disposer = autorun(() => {
+      mapStore.drawCheckpoints(
+        checkpoints,
+        trackingStore.visitedCheckpointIds,
+        trackingStore.nearCheckpointId,
+      );
+    });
+    return disposer;
+  }, [checkpoints, mapStore, trackingStore]);
+
   if (store.group === null) return <Navigate to="/group" replace />;
 
   if (store.group === undefined) {
@@ -145,7 +179,7 @@ export const GroupMapPage = observer(() => {
     );
   }
 
-  const isAdmin = store.currentUserId === store.group.created_by;
+
   const isTrackingActive = trackingStore.isTracking || trackingStore.saving;
   // 고도 시트 높이 220px. 시트가 열리면 버튼/패널을 위로 밀어올림
   const sideButtonsBottom = showElevation ? 236 : isTrackingActive ? 176 : 96;
@@ -164,6 +198,7 @@ export const GroupMapPage = observer(() => {
       lat: trackingStore.latestLat,
       lng: trackingStore.latestLng,
       avatarUrl: null,
+      checkpointsVisited: trackingStore.visitedCheckpointIds.size,
     };
     return [...leaderboardStore.rankings, myEntry].sort((a, b) => b.maxRouteMeters - a.maxRouteMeters);
   })();
@@ -296,32 +331,13 @@ export const GroupMapPage = observer(() => {
           style={{ bottom: bottomCenterBottom }}
         >
           {/* Tracking start button — visible to everyone when period is active and not tracking */}
-          {store.isPeriodActive && !trackingStore.isTracking && !trackingStore.saving && !trackingStore.restoring && (
+          {store.isPeriodActive && !trackingStore.isTracking && !trackingStore.saving && !trackingStore.restoring && !showCountdown && (
             <button
-              onClick={() => void trackingStore.start()}
-              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); void trackingStore.start(); }}
+              onClick={() => setShowCountdown(true)}
+              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); setShowCountdown(true); }}
               className="px-10 py-3.5 rounded-full text-[15px] font-bold shadow-lg transition-transform bg-black text-white shadow-black/25 active:scale-95"
             >
               시작
-            </button>
-          )}
-          {/* Admin period controls */}
-          {isAdmin && !store.isPeriodActive && (
-            <button
-              onClick={() => void store.startPeriod()}
-              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); void store.startPeriod(); }}
-              className="bg-black text-white px-10 py-3.5 rounded-full text-[15px] font-bold shadow-lg shadow-black/25 active:scale-95 transition-transform"
-            >
-              활동 시작
-            </button>
-          )}
-          {isAdmin && store.isPeriodActive && !trackingStore.isTracking && !trackingStore.saving && (
-            <button
-              onClick={() => void store.endPeriod()}
-              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); void store.endPeriod(); }}
-              className="bg-white text-black/60 px-10 py-3.5 rounded-full text-[15px] font-bold shadow-lg shadow-black/10 border border-black/[0.06] active:scale-95 transition-transform"
-            >
-              활동 종료
             </button>
           )}
         </div>
@@ -333,15 +349,6 @@ export const GroupMapPage = observer(() => {
           className="absolute left-4 right-4 z-[101] flex flex-col items-center gap-2 transition-all duration-300"
           style={{ bottom: trackingPanelBottom }}
         >
-          {isAdmin && store.isPeriodActive && (
-            <button
-              onClick={() => void store.endPeriod()}
-              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); void store.endPeriod(); }}
-              className="bg-white text-black/60 px-10 py-3.5 rounded-full text-[15px] font-bold shadow-lg shadow-black/10 border border-black/[0.06] active:scale-95 transition-transform"
-            >
-              활동 종료
-            </button>
-          )}
         <div className="w-full bg-white rounded-2xl shadow-xl shadow-black/10 border border-black/[0.06] px-5 py-4">
           <div className="flex justify-around text-center mb-3">
             <div>
@@ -365,11 +372,13 @@ export const GroupMapPage = observer(() => {
           )}
           {!trackingStore.saving && (
             <button
-              onClick={() => setShowRestartConfirm(true)}
-              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); setShowRestartConfirm(true); }}
-              className="w-full py-3 rounded-xl text-[14px] font-semibold bg-black/[0.08] text-black/60"
+              onClick={() => !resetting && setShowRestartConfirm(true)}
+              onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); if (!resetting) setShowRestartConfirm(true); }}
+              disabled={resetting}
+              className="w-full py-3 rounded-xl text-[14px] font-semibold bg-black/[0.08] text-black/60 disabled:opacity-40 flex items-center justify-center gap-2"
             >
-              재시작
+              {resetting && <div className="w-4 h-4 border-2 border-black/15 border-t-black/50 rounded-full animate-spin" />}
+              {resetting ? '초기화 중...' : '초기화'}
             </button>
           )}
         </div>
@@ -427,7 +436,10 @@ export const GroupMapPage = observer(() => {
                 {r.isLive && (
                   <span className="text-[11px] text-trail-green font-semibold mr-2">LIVE</span>
                 )}
-                <span className="text-[13px] text-black/40 tabular-nums font-semibold">
+                <span className="text-[13px] text-black/40 tabular-nums font-semibold flex items-center gap-1.5">
+                  {totalCheckpoints > 0 && (
+                    <span className="text-[11px] text-black/25">{r.checkpointsVisited ?? 0}/{totalCheckpoints}</span>
+                  )}
                   {formatProgress(r.maxRouteMeters)}
                 </span>
               </div>
@@ -467,9 +479,29 @@ export const GroupMapPage = observer(() => {
 
     <RestartConfirmSheet
       open={showRestartConfirm}
-      onConfirm={() => { setShowRestartConfirm(false); void trackingStore.restart(); }}
+      onConfirm={() => {
+        setShowRestartConfirm(false);
+        setResetting(true);
+        void trackingStore.restart().finally(() => setResetting(false));
+      }}
       onCancel={() => setShowRestartConfirm(false)}
     />
+
+    {showCountdown && !starting && (
+      <CountdownOverlay onComplete={() => {
+        setStarting(true);
+        void trackingStore.start().finally(() => {
+          setStarting(false);
+          setShowCountdown(false);
+        });
+      }} />
+    )}
+
+    {starting && (
+      <div className="fixed inset-0 z-[9999] bg-black flex items-center justify-center">
+        <div className="w-7 h-7 border-3 border-white/20 border-t-white rounded-full animate-spin" />
+      </div>
+    )}
     </>
   );
 });
