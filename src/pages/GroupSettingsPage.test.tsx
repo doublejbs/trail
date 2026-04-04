@@ -17,6 +17,9 @@ const FAKE_GROUP: Group = {
   max_members: null,
   period_started_at: null,
   period_ended_at: null,
+  distance_m: null,
+  elevation_gain_m: null,
+  difficulty: null,
 };
 
 const { mockStore } = vi.hoisted(() => ({

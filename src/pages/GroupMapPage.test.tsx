@@ -15,6 +15,9 @@ const FAKE_GROUP: Group = {
   max_members: null,
   period_started_at: null,
   period_ended_at: null,
+  distance_m: null,
+  elevation_gain_m: null,
+  difficulty: null,
 };
 
 const FAKE_GPX = `<?xml version="1.0"?><gpx><trk><trkseg><trkpt lat="37.5" lon="126.9"></trkpt></trkseg></trk></gpx>`;
