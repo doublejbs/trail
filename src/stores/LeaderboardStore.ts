@@ -9,6 +9,7 @@ interface Ranking {
   lat: number | null;
   lng: number | null;
   avatarUrl: string | null;
+  checkpointsVisited: number;
 }
 
 class LeaderboardStore {
@@ -69,6 +70,25 @@ class LeaderboardStore {
         }));
       }
 
+      // 체크포인트 통과 수 집계: 유저별 최대 세션의 통과 수
+      const checkpointCountMap = new Map<string, number>();
+      if (userIds.length > 0) {
+        const { data: visits } = await supabase
+          .from('checkpoint_visits')
+          .select('user_id, checkpoint_id')
+          .in('user_id', userIds);
+        if (visits) {
+          const byUser = new Map<string, Set<string>>();
+          for (const v of visits) {
+            if (!byUser.has(v.user_id)) byUser.set(v.user_id, new Set());
+            byUser.get(v.user_id)!.add(v.checkpoint_id);
+          }
+          for (const [uid, cpIds] of byUser) {
+            checkpointCountMap.set(uid, cpIds.size);
+          }
+        }
+      }
+
       // group_member_positions에서 그룹 전체 위치 조회 (tracking session 없는 멤버 포함)
       const positionMap = new Map<string, { lat: number; lng: number }>();
       const { data: positions } = await supabase
@@ -112,6 +132,7 @@ class LeaderboardStore {
             lat: positionMap.get(userId)?.lat ?? null,
             lng: positionMap.get(userId)?.lng ?? null,
             avatarUrl: avatarUrlMap.get(userId) ?? null,
+            checkpointsVisited: checkpointCountMap.get(userId) ?? 0,
           }))
           .sort((a, b) => b.maxRouteMeters - a.maxRouteMeters);
         this.loading = false;
@@ -126,12 +147,13 @@ class LeaderboardStore {
 
     const channel = supabase.channel(`group-progress:${this.groupId}`);
     channel.on('broadcast', { event: 'progress' }, (msg) => {
-      const { userId, displayName, maxRouteMeters, lat, lng } = msg.payload as {
+      const { userId, displayName, maxRouteMeters, lat, lng, checkpointsVisited } = msg.payload as {
         userId: string;
         displayName: string;
         maxRouteMeters: number;
         lat: number | null;
         lng: number | null;
+        checkpointsVisited?: number;
       };
       runInAction(() => {
         const existing = this.rankings.find((r) => r.userId === userId);
@@ -139,10 +161,11 @@ class LeaderboardStore {
           existing.maxRouteMeters = maxRouteMeters;
           if (existing.displayName === '알 수 없음') existing.displayName = displayName;
           existing.isLive = true;
+          if (checkpointsVisited != null) existing.checkpointsVisited = checkpointsVisited;
           if (lat != null) existing.lat = lat;
           if (lng != null) existing.lng = lng;
         } else {
-          this.rankings.push({ userId, displayName, maxRouteMeters, isLive: true, lat, lng, avatarUrl: null });
+          this.rankings.push({ userId, displayName, maxRouteMeters, isLive: true, lat, lng, avatarUrl: null, checkpointsVisited: checkpointsVisited ?? 0 });
         }
         this.rankings.sort((a, b) => b.maxRouteMeters - a.maxRouteMeters);
       });
