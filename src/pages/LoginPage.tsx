@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
 import { Loader2 } from 'lucide-react';
-import { Capacitor } from '@capacitor/core';
 import { AuthStore } from '../stores/AuthStore';
 import { LoginStore } from '../stores/LoginStore';
 
@@ -22,12 +21,9 @@ export const LoginPage = observer(() => {
   }
 
   const handleLogin = (provider: 'google' | 'kakao') => {
-    const isNative = Capacitor.isNativePlatform();
-    const redirectTo = isNative
-      ? 'https://trail-five.vercel.app/auth/native-callback.html'
-      : next
-        ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
-        : `${window.location.origin}/auth/callback`;
+    const redirectTo = next
+      ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+      : `${window.location.origin}/auth/callback`;
     store.login(provider, redirectTo);
   };
 

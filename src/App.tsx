@@ -1,29 +1,12 @@
 import { Capacitor } from '@capacitor/core';
-import { App as CapApp } from '@capacitor/app';
-import { Browser } from '@capacitor/browser';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { supabase } from './lib/supabase';
 
 if (Capacitor.isNativePlatform()) {
   StatusBar.setStyle({ style: Style.Light });
   StatusBar.setBackgroundColor({ color: '#ffffff' });
   SplashScreen.hide();
-
-  // OAuth 딥링크 리스너: 외부 브라우저에서 앱으로 돌아올 때 URL을 Supabase에 전달
-  CapApp.addListener('appUrlOpen', ({ url }: { url: string }) => {
-    if (url.includes('auth/callback') || url.includes('com.trail.app://auth/callback')) {
-      Browser.close();
-      const parsed = new URL(url);
-      const code = parsed.searchParams.get('code');
-      if (code) {
-        supabase.auth.exchangeCodeForSession(code).then(() => {
-          window.location.href = '/auth/callback';
-        });
-      }
-    }
-  });
 }
 
 import { ProtectedRoute } from './components/ProtectedRoute';
