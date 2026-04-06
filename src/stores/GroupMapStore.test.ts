@@ -21,24 +21,38 @@ const FAKE_GROUP = {
   period_ended_at: null,
 };
 
+const makeChainable = (result: Promise<unknown>) => {
+  const chain: Record<string, unknown> = {
+    eq: () => chain,
+    in: () => chain,
+    then: (r: unknown, e: unknown) => result.then(r as () => unknown, e as () => unknown),
+  };
+  return chain;
+};
+
 vi.mock('../lib/supabase', () => ({
   supabase: {
     auth: { getUser: () => mockGetUser() },
-    from: (_table: string) => ({
+    from: () => ({
       select: () => ({
         eq: () => ({
           single: () => mockSelect(),
         }),
       }),
-      update: (data: unknown) => ({
-        eq: () => mockUpdate(data),
-      }),
+      update: (data: unknown) => makeChainable(
+        Promise.resolve().then(() => mockUpdate(data)),
+      ),
     }),
     storage: {
       from: () => ({
         createSignedUrl: () => mockGetSignedUrl(),
       }),
     },
+    channel: () => ({
+      subscribe: vi.fn(),
+      send: vi.fn(),
+    }),
+    removeChannel: vi.fn(),
   },
 }));
 

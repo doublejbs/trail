@@ -116,6 +116,6 @@ describe('GroupCreatePage', () => {
     const { container } = render(<MemoryRouter><GroupCreatePage /></MemoryRouter>);
     // label이 파일 선택 UI, input은 hidden으로 label에 연결됨
     expect(container.querySelector('input[type="file"]')).toBeTruthy();
-    expect(screen.getByText('파일 선택')).toBeTruthy();
+    expect(screen.getByText('GPX 파일을 선택하세요')).toBeTruthy();
   });
 });

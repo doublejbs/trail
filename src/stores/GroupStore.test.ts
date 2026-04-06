@@ -6,16 +6,44 @@ const { mockGetUser, mockOrder } = vi.hoisted(() => ({
   mockOrder: vi.fn(),
 }));
 
+const { mockMemberSelect } = vi.hoisted(() => ({
+  mockMemberSelect: vi.fn(),
+}));
+
 vi.mock('../lib/supabase', () => ({
   supabase: {
     auth: {
       getUser: () => mockGetUser(),
     },
-    from: () => ({
-      select: () => ({
-        order: (...args: unknown[]) => mockOrder(...args),
+    from: (table: string) => {
+      if (table === 'group_members') {
+        return {
+          select: () => ({
+            eq: () => mockMemberSelect(),
+            in: () => ({
+              order: () => mockMemberSelect(),
+            }),
+          }),
+        };
+      }
+      if (table === 'profiles') {
+        return {
+          select: () => ({
+            in: () => Promise.resolve({ data: [] }),
+          }),
+        };
+      }
+      return {
+        select: () => ({
+          order: (...args: unknown[]) => mockOrder(...args),
+        }),
+      };
+    },
+    storage: {
+      from: () => ({
+        createSignedUrl: () => Promise.resolve({ data: null }),
       }),
-    }),
+    },
   },
 }));
 
@@ -37,6 +65,7 @@ describe('GroupStore', () => {
     vi.clearAllMocks();
     mockGetUser.mockResolvedValue({ data: { user: { id: FAKE_USER_ID } }, error: null });
     mockOrder.mockResolvedValue({ data: [], error: null });
+    mockMemberSelect.mockResolvedValue({ data: [] });
     store = new GroupStore();
   });
 
@@ -54,7 +83,7 @@ describe('GroupStore', () => {
 
       await store.load();
 
-      expect(store.groups).toEqual(fakeGroups);
+      expect(store.groups).toEqual([expect.objectContaining({ id: 'g1', name: 'Group g1' })]);
       expect(store.loading).toBe(false);
       expect(store.error).toBe(false);
     });

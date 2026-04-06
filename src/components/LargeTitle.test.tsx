@@ -8,8 +8,10 @@ describe('LargeTitle', () => {
     expect(screen.getByRole('heading', { name: '그룹', level: 1 })).toBeInTheDocument();
   });
 
-  it('text-hig-title1 클래스 적용', () => {
+  it('text-[26px] font-extrabold 클래스 적용', () => {
     render(<LargeTitle title="코스" />);
-    expect(screen.getByRole('heading', { name: '코스', level: 1 })).toHaveClass('text-hig-title1');
+    const heading = screen.getByRole('heading', { name: '코스', level: 1 });
+    expect(heading).toHaveClass('text-[26px]');
+    expect(heading).toHaveClass('font-extrabold');
   });
 });

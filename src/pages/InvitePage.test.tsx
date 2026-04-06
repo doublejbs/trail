@@ -12,7 +12,7 @@ const mockStore = observable({
   groupId: null as string | null,
   sessionChecked: false,
   isLoggedIn: false,
-  checkAndJoin: mockCheckAndJoin,
+  checkAndPreview: mockCheckAndJoin,
 });
 
 vi.mock('../stores/JoinGroupStore', () => ({
@@ -58,7 +58,7 @@ describe('InvitePage', () => {
     });
   });
 
-  it('로그인 상태면 checkAndJoin 호출', async () => {
+  it('로그인 상태면 checkAndPreview 호출', async () => {
     mockCheckAndJoin.mockImplementation(async () => {
       runInAction(() => {
         mockStore.sessionChecked = true;

@@ -110,6 +110,8 @@ describe('CourseUploadStore', () => {
         distance_m: 150,
         elevation_gain_m: 10,
         region: null,
+        start_lat: 37.5,
+        start_lng: 127.0,
         thumbnail_path: null,
         is_public: true,
       });

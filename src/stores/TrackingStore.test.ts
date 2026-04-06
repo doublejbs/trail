@@ -21,6 +21,15 @@ const mockChannel = {
   send: (...args: unknown[]) => mockChannelSend(...args),
 };
 
+const makeUpdateChain = (data: unknown) => {
+  const chain: Record<string, unknown> = {
+    eq: () => chain,
+    in: () => mockUpdate(data),
+    then: (r: unknown, e: unknown) => Promise.resolve(mockUpdate(data)).then(r as () => unknown, e as () => unknown),
+  };
+  return chain;
+};
+
 vi.mock('../lib/supabase', () => ({
   supabase: {
     auth: { getUser: () => mockGetUser() },
@@ -32,9 +41,7 @@ vi.mock('../lib/supabase', () => ({
       }
       return {
         insert: (...args: unknown[]) => mockInsert(...args),
-        update: (data: unknown) => ({
-          eq: () => mockUpdate(data),
-        }),
+        update: (data: unknown) => makeUpdateChain(data),
         select: () => ({
           eq: () => ({
             eq: () => ({
@@ -138,13 +145,14 @@ describe('TrackingStore', () => {
   });
 
   describe('restart()', () => {
-    it('기존 세션을 완료하고 새 세션을 시작', async () => {
+    it('기존 세션을 완료하고 상태를 초기화', async () => {
       await store.start();
-      const firstInsertCount = mockInsert.mock.calls.length;
       await store.restart();
       expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: 'completed' }));
-      expect(mockInsert.mock.calls.length).toBe(firstInsertCount + 1);
-      expect(store.isTracking).toBe(true);
+      expect(store.isTracking).toBe(false);
+      expect(store.elapsedSeconds).toBe(0);
+      expect(store.distanceMeters).toBe(0);
+      expect(store.maxRouteMeters).toBe(0);
     });
   });
 
@@ -212,24 +220,5 @@ describe('TrackingStore', () => {
     });
   });
 
-  describe('broadcast', () => {
-    it('start() 후 _initBroadcast가 채널 구독', async () => {
-      mockProfileSelect.mockResolvedValue({ data: { display_name: '홍길동' } });
-      await store.start();
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-      expect(mockChannelSubscribe).toHaveBeenCalled();
-    });
-
-    it('dispose() 시 채널 제거', async () => {
-      mockProfileSelect.mockResolvedValue({ data: { display_name: '홍길동' } });
-      await store.start();
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-      store.dispose();
-      expect(mockRemoveChannel).toHaveBeenCalled();
-    });
-  });
+  // broadcast 기능은 TrackingBroadcastStore로 분리됨
 });

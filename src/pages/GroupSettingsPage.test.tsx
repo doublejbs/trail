@@ -30,11 +30,18 @@ const { mockStore } = vi.hoisted(() => ({
     invites: [] as { id: string; group_id: string; token: string; is_active: boolean; created_at: string }[],
     members: [] as { id: string; group_id: string; user_id: string; joined_at: string }[],
     error: null as string | null,
+    isPeriodActive: false,
+    checkpoints: [] as { id: string; group_id: string; name: string; lat: number; lng: number; radius_m: number; sort_order: number; is_finish: boolean }[],
     load: vi.fn(),
     setMaxInput: vi.fn(),
     createInvite: vi.fn(),
     deactivateInvite: vi.fn(),
     updateMaxMembers: vi.fn(),
+    startPeriod: vi.fn(),
+    endPeriod: vi.fn(),
+    addCheckpoint: vi.fn(),
+    removeCheckpoint: vi.fn(),
+    reorderCheckpoints: vi.fn(),
   },
 }));
 
@@ -61,6 +68,7 @@ describe('GroupSettingsPage', () => {
     mockStore.maxInput = '';
     mockStore.invites = [];
     mockStore.members = [];
+    mockStore.checkpoints = [];
     mockStore.error = null;
     mockStore.load.mockResolvedValue(undefined);
     mockStore.createInvite.mockResolvedValue(undefined);

@@ -134,6 +134,9 @@ describe('GroupCreateStore', () => {
         created_by: FAKE_USER_ID,
         gpx_path: `${FAKE_USER_ID}/${FAKE_GROUP_ID}.gpx`,
         gpx_bucket: 'gpx-files',
+        thumbnail_path: null,
+        distance_m: null,
+        elevation_gain_m: null,
       });
     });
 
