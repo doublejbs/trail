@@ -22,7 +22,7 @@ export const CheckpointEditPage = observer(() => {
   const [gpxText, setGpxText] = useState<string | null>(null);
   const [editingCp, setEditingCp] = useState<Checkpoint | null>(null);
   const [cpName, setCpName] = useState('');
-  const [cpRadius, setCpRadius] = useState('30');
+  const [cpRadius, setCpRadius] = useState('100');
   const [showSheet, setShowSheet] = useState(false);
   const [pendingSnap, setPendingSnap] = useState<{ lat: number; lng: number; distanceFromStart: number } | null>(null);
 
@@ -131,8 +131,8 @@ export const CheckpointEditPage = observer(() => {
         setPendingSnap(snap);
         setEditingCp(null);
         setCpName('');
-        setCpRadius('30');
-        showPendingMarker(snap.lat, snap.lng, 30);
+        setCpRadius('100');
+        showPendingMarker(snap.lat, snap.lng, 100);
         setShowSheet(true);
       }
     });
