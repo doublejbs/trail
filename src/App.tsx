@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
+import { Browser } from '@capacitor/browser';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
@@ -13,8 +14,8 @@ if (Capacitor.isNativePlatform()) {
   // OAuth 딥링크 리스너: 외부 브라우저에서 앱으로 돌아올 때 URL을 Supabase에 전달
   CapApp.addListener('appUrlOpen', ({ url }: { url: string }) => {
     if (url.includes('auth/callback')) {
+      Browser.close();
       const parsed = new URL(url);
-      // PKCE 플로우: code를 Supabase에 전달하여 세션 교환
       const code = parsed.searchParams.get('code');
       if (code) {
         supabase.auth.exchangeCodeForSession(code).then(() => {
