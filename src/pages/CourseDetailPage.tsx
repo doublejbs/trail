@@ -2,126 +2,41 @@
 import { useRef, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
-import { makeAutoObservable, runInAction } from 'mobx';
-import type { NavigateFunction } from 'react-router-dom';
 import { Heart, Send, Mountain, Route } from 'lucide-react';
 import { toast } from 'sonner';
 import { CourseDetailStore } from '../stores/CourseDetailStore';
 import { MapStore } from '../stores/MapStore';
+import { MapRenderingStore } from '../stores/MapRenderingStore';
+import { CourseDetailUIStore } from '../stores/ui/CourseDetailUIStore';
 import { NavigationBar } from '../components/NavigationBar';
 import { ElevationChart } from '../components/ElevationChart';
-import { supabase } from '../lib/supabase';
-import { parseGpxCoords, computeDistanceM } from '../lib/gpx';
-import type { Course } from '../types/course';
-
-class QuickGroupCreateStore {
-  public name = '';
-  public submitting = false;
-  private course: Course;
-  private nav: NavigateFunction;
-
-  constructor(course: Course, navigate: NavigateFunction) {
-    this.course = course;
-    this.nav = navigate;
-    makeAutoObservable(this);
-  }
-
-  public setName(v: string) { this.name = v; }
-
-  public get canSubmit() { return this.name.trim().length > 0 && !this.submitting; }
-
-  public async create() {
-    if (!this.canSubmit) return;
-    runInAction(() => { this.submitting = true; });
-
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData.user?.id;
-    if (!userId) {
-      runInAction(() => { this.submitting = false; });
-      toast.error('로그인이 필요합니다');
-      return;
-    }
-
-    const groupId = crypto.randomUUID();
-    const { error } = await supabase.from('groups').insert({
-      id: groupId,
-      name: this.name.trim(),
-      created_by: userId,
-      gpx_path: this.course.gpx_path,
-      gpx_bucket: 'course-gpx',
-      thumbnail_path: this.course.thumbnail_path ?? null,
-    });
-
-    if (error) {
-      runInAction(() => { this.submitting = false; });
-      toast.error('그룹 생성에 실패했습니다');
-      return;
-    }
-
-    // 종료 체크포인트 자동 생성
-    try {
-      const { data: urlData } = await supabase.storage
-        .from('course-gpx')
-        .createSignedUrl(this.course.gpx_path, 60);
-      if (urlData?.signedUrl) {
-        const resp = await fetch(urlData.signedUrl);
-        if (resp.ok) {
-          const gpxText = await resp.text();
-          const coords = parseGpxCoords(gpxText);
-          if (coords && coords.length >= 2) {
-            const lastCoord = coords[coords.length - 1];
-            const totalDist = computeDistanceM(coords);
-            await supabase.from('checkpoints').insert({
-              group_id: groupId,
-              name: '종료',
-              lat: lastCoord.lat,
-              lng: lastCoord.lon,
-              radius_m: 30,
-              sort_order: totalDist,
-              is_finish: true,
-            });
-          }
-        }
-      }
-    } catch {
-      // 체크포인트 생성 실패해도 그룹 생성은 성공으로 처리
-    }
-
-    runInAction(() => { this.submitting = false; });
-    this.nav(`/group/${groupId}`);
-  }
-}
 
 export const CourseDetailPage = observer(() => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [store] = useState(() => new CourseDetailStore(id!));
   const [mapStore] = useState(() => new MapStore());
+  const [renderingStore] = useState(() => new MapRenderingStore(() => mapStore.map));
+  const [uiStore] = useState(() => new CourseDetailUIStore(navigate));
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<naver.maps.Map | null>(null);
-  const [gpxText, setGpxText] = useState<string | null | undefined>(undefined);
   const elevationMarkerRef = useRef<naver.maps.Marker | null>(null);
-  const [showCreateSheet, setShowCreateSheet] = useState(false);
-  const [sheetVisible, setSheetVisible] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [quickStore, setQuickStore] = useState<QuickGroupCreateStore | null>(null);
 
   const openSheet = () => {
     if (!store.course) return;
-    const qs = new QuickGroupCreateStore(store.course, navigate);
-    setQuickStore(qs);
-    setShowCreateSheet(true);
+    uiStore.openSheet();
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        setSheetVisible(true);
+        uiStore.setSheetVisible(true);
         setTimeout(() => inputRef.current?.focus(), 320);
       });
     });
   };
 
   const closeSheet = () => {
-    setSheetVisible(false);
-    setTimeout(() => { setShowCreateSheet(false); setQuickStore(null); }, 300);
+    uiStore.closeSheet();
+    setTimeout(() => uiStore.hideSheet(), 300);
   };
 
   useEffect(() => {
@@ -130,28 +45,8 @@ export const CourseDetailPage = observer(() => {
 
   useEffect(() => {
     if (!store.course) return;
-    let cancelled = false;
-
-    (async () => {
-      const { data, error } = await supabase.storage
-        .from('course-gpx')
-        .createSignedUrl(store.course!.gpx_path, 3600);
-
-      if (cancelled) return;
-      if (error || !data?.signedUrl) { setGpxText(null); return; }
-
-      try {
-        const res = await fetch(data.signedUrl);
-        if (!res.ok) { setGpxText(null); return; }
-        const text = await res.text();
-        if (!cancelled) setGpxText(text);
-      } catch {
-        if (!cancelled) setGpxText(null);
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, [store.course]);
+    void uiStore.loadGpxText(store.course.gpx_path);
+  }, [store.course, uiStore]);
 
   // 지도 초기화 — GPX start 좌표 기반, 없으면 서울
   useEffect(() => {
@@ -163,17 +58,18 @@ export const CourseDetailPage = observer(() => {
     );
     mapInstanceRef.current = mapStore.map;
     return () => {
+      renderingStore.destroy();
       mapStore.destroy();
       mapInstanceRef.current = null;
     };
-  }, [mapStore, store.loading]);
+  }, [mapStore, renderingStore, store.loading]);
 
   // GPX 준비되면 경로 그리기
   useEffect(() => {
-    if (!gpxText || !mapStore.map) return;
-    mapStore.drawGpxRoute(gpxText);
-    mapStore.returnToCourse();
-  }, [mapStore, gpxText]);
+    if (!uiStore.gpxText || !mapStore.map) return;
+    renderingStore.drawGpxRoute(uiStore.gpxText);
+    renderingStore.returnToCourse();
+  }, [renderingStore, uiStore.gpxText, mapStore.map]);
 
   const handleLike = async () => {
     await store.toggleLike();
@@ -219,7 +115,7 @@ export const CourseDetailPage = observer(() => {
         <div ref={mapRef} data-testid="map-container" className="absolute inset-0 w-full h-full" />
 
         {/* GPX 로딩 중 — shimmer + 경로 탐색 pulse (경로 그려질 때까지 유지) */}
-        {!mapStore.gpxPolyline && !mapStore.error && (
+        {!renderingStore.gpxPolyline && !mapStore.error && (
           <div className="absolute inset-0 pointer-events-none overflow-hidden">
             {/* shimmer sweep */}
             <div
@@ -286,7 +182,7 @@ export const CourseDetailPage = observer(() => {
           )}
         </div>
 
-        {gpxText === undefined && (
+        {uiStore.gpxText === undefined && (
           <div className="border-t border-black/[0.04] px-4 pt-3 pb-2">
             <svg
               viewBox="0 0 360 140"
@@ -340,10 +236,10 @@ export const CourseDetailPage = observer(() => {
           </div>
         )}
 
-        {typeof gpxText === 'string' && (
+        {typeof uiStore.gpxText === 'string' && (
           <div className="border-t border-black/[0.04]">
             <ElevationChart
-              gpxText={gpxText}
+              gpxText={uiStore.gpxText}
               onActiveCoord={(coord) => {
                 const map = mapInstanceRef.current;
                 if (!coord || !map) {
@@ -464,12 +360,12 @@ export const CourseDetailPage = observer(() => {
       </div>
 
       {/* Quick group create bottom sheet */}
-      {showCreateSheet && (
+      {uiStore.showCreateSheet && (
         <>
           {/* Backdrop */}
           <div
             className="fixed inset-0 z-40 transition-all duration-300"
-            style={{ background: sheetVisible ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0)', backdropFilter: sheetVisible ? 'blur(4px)' : 'none' }}
+            style={{ background: uiStore.sheetVisible ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0)', backdropFilter: uiStore.sheetVisible ? 'blur(4px)' : 'none' }}
             onClick={closeSheet}
           />
 
@@ -477,7 +373,7 @@ export const CourseDetailPage = observer(() => {
           <div
             className="fixed left-0 right-0 bottom-0 z-50 bg-white rounded-t-3xl shadow-2xl transition-transform duration-300 ease-out"
             style={{
-              transform: sheetVisible ? 'translateY(0)' : 'translateY(100%)',
+              transform: uiStore.sheetVisible ? 'translateY(0)' : 'translateY(100%)',
               paddingBottom: 'env(safe-area-inset-bottom)',
             }}
           >
@@ -506,29 +402,29 @@ export const CourseDetailPage = observer(() => {
                 <input
                   ref={inputRef}
                   type="text"
-                  value={quickStore?.name ?? ''}
-                  onChange={(e) => quickStore?.setName(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && quickStore?.canSubmit) void quickStore.create(); }}
+                  value={uiStore.groupName}
+                  onChange={(e) => uiStore.setGroupName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && uiStore.canSubmit) void uiStore.createGroup(store.course!); }}
                   placeholder="그룹 이름을 입력하세요"
                   maxLength={30}
                   className="w-full bg-black/[0.04] rounded-2xl px-4 py-3.5 text-[15px] font-medium text-black outline-none border-2 border-transparent focus:border-black/15 transition-all duration-200 placeholder:text-black/25"
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-medium text-black/20 tabular-nums">
-                  {quickStore?.name.length ?? 0}/30
+                  {uiStore.groupName.length}/30
                 </span>
               </div>
 
               {/* Create button */}
               <button
-                onClick={() => void quickStore?.create()}
-                disabled={!quickStore?.canSubmit}
+                onClick={() => void uiStore.createGroup(store.course!)}
+                disabled={!uiStore.canSubmit}
                 className="w-full py-4 rounded-2xl text-[15px] font-bold transition-all duration-200 flex items-center justify-center gap-2"
                 style={{
-                  background: quickStore?.canSubmit ? '#000' : 'rgba(0,0,0,0.06)',
-                  color: quickStore?.canSubmit ? '#fff' : 'rgba(0,0,0,0.25)',
+                  background: uiStore.canSubmit ? '#000' : 'rgba(0,0,0,0.06)',
+                  color: uiStore.canSubmit ? '#fff' : 'rgba(0,0,0,0.25)',
                 }}
               >
-                {quickStore?.submitting ? (
+                {uiStore.groupCreateStore.submitting ? (
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
                   '그룹 만들기'
