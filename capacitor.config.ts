@@ -4,6 +4,9 @@ const config: CapacitorConfig = {
   appId: 'com.trail.app',
   appName: 'waypoint',
   webDir: 'dist',
+  server: {
+    androidScheme: 'https',
+  },
   plugins: {
     SplashScreen: {
       launchAutoHide: true,
