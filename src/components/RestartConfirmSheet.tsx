@@ -6,7 +6,7 @@ interface Props {
   onCancel: () => void;
 }
 
-export function RestartConfirmSheet({ open, onConfirm, onCancel }: Props) {
+export const RestartConfirmSheet = ({ open, onConfirm, onCancel }: Props) => {
   const sheetRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -93,4 +93,4 @@ export function RestartConfirmSheet({ open, onConfirm, onCancel }: Props) {
       </div>
     </>
   );
-}
+};

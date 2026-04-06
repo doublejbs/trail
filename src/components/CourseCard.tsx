@@ -7,16 +7,16 @@ import type { Course } from '../types/course';
 const THUMB_W = 96;
 const THUMB_H = 96;
 
-function formatDistance(m: number | null): string {
+const formatDistance = (m: number | null): string => {
   if (m === null) return '—';
   if (m >= 1000) return `${(m / 1000).toFixed(1)} km`;
   return `${m} m`;
-}
+};
 
-function formatElevation(m: number | null): string {
+const formatElevation = (m: number | null): string => {
   if (m === null) return '';
   return `${m} m`;
-}
+};
 
 interface Props {
   course: Course;
@@ -24,7 +24,7 @@ interface Props {
   onClick: () => void;
 }
 
-export function CourseCard({ course, likeCount, onClick }: Props) {
+export const CourseCard = ({ course, likeCount, onClick }: Props) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [svgPoints, setSvgPoints] = useState<string | null>(null);
@@ -172,4 +172,4 @@ export function CourseCard({ course, likeCount, onClick }: Props) {
       </div>
     </div>
   );
-}
+};

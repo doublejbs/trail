@@ -5,13 +5,13 @@ import { JoinGroupStore } from "../stores/JoinGroupStore";
 import { NavigationBar } from "../components/NavigationBar";
 import { supabase } from "../lib/supabase";
 
-function GroupThumbnail({
+const GroupThumbnail = ({
   path,
   bucket,
 }: {
   path: string | null;
   bucket: string;
-}) {
+}) => {
   const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,7 +35,7 @@ function GroupThumbnail({
   return (
     <img src={url} className="w-20 h-20 rounded-2xl object-cover" alt="" />
   );
-}
+};
 
 export const InvitePage = observer(() => {
   const { token } = useParams<{ token: string }>();

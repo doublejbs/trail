@@ -3,7 +3,7 @@ import { BottomTabBar } from '../components/BottomTabBar'
 
 const TAB_PATHS = ['/group', '/my', '/course', '/profile'];
 
-export function MainLayout() {
+export const MainLayout = () => {
   const location = useLocation();
   const showTabBar = TAB_PATHS.includes(location.pathname);
 
@@ -14,5 +14,5 @@ export function MainLayout() {
       </div>
       {showTabBar && <BottomTabBar />}
     </div>
-  )
-}
+  );
+};

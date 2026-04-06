@@ -4,7 +4,7 @@ interface CountdownOverlayProps {
   onComplete: () => void;
 }
 
-export function CountdownOverlay({ onComplete }: CountdownOverlayProps) {
+export const CountdownOverlay = ({ onComplete }: CountdownOverlayProps) => {
   const [count, setCount] = useState(3);
   const [animKey, setAnimKey] = useState(0);
 
@@ -61,4 +61,4 @@ export function CountdownOverlay({ onComplete }: CountdownOverlayProps) {
       `}</style>
     </div>
   );
-}
+};

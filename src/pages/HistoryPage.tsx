@@ -6,26 +6,26 @@ import { HistoryStore } from '../stores/HistoryStore';
 import type { HistorySession } from '../stores/HistoryStore';
 import { LargeTitle } from '../components/LargeTitle';
 
-function formatTime(seconds: number): string {
+const formatTime = (seconds: number): string => {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
   if (h > 0) return `${h}시간 ${m}분`;
   if (m > 0) return `${m}분 ${s}초`;
   return `${s}초`;
-}
+};
 
-function formatDistance(meters: number): string {
+const formatDistance = (meters: number): string => {
   if (meters >= 1000) return `${(meters / 1000).toFixed(1)}km`;
   return `${Math.round(meters)}m`;
-}
+};
 
-function formatDate(iso: string): string {
+const formatDate = (iso: string): string => {
   const d = new Date(iso);
   return d.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' });
-}
+};
 
-function SessionCard({ session, onClick }: { session: HistorySession; onClick: () => void }) {
+const SessionCard = ({ session, onClick }: { session: HistorySession; onClick: () => void }) => {
   return (
     <button
       onClick={onClick}
@@ -65,7 +65,7 @@ function SessionCard({ session, onClick }: { session: HistorySession; onClick: (
       </div>
     </button>
   );
-}
+};
 
 export const HistoryPage = observer(() => {
   const navigate = useNavigate();

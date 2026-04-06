@@ -3,7 +3,7 @@ import { User, ArrowRight, Ruler, Mountain } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Group } from '../types/group';
 
-export function useSignedUrl(group: Group, elRef: React.RefObject<HTMLElement | null>) {
+export const useSignedUrl = (group: Group, elRef: React.RefObject<HTMLElement | null>) => {
   const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -33,9 +33,9 @@ export function useSignedUrl(group: Group, elRef: React.RefObject<HTMLElement | 
   }, [group.thumbnail_path, group.gpx_bucket]);
 
   return url;
-}
+};
 
-function getGroupStatus(group: Group): { label: string; active: boolean } {
+const getGroupStatus = (group: Group): { label: string; active: boolean } => {
   const now = Date.now();
   if (group.period_started_at && group.period_ended_at) {
     const end = new Date(group.period_ended_at).getTime();
@@ -46,17 +46,17 @@ function getGroupStatus(group: Group): { label: string; active: boolean } {
     if (now >= start) return { label: '진행 중', active: true };
   }
   return { label: '진행 중', active: true };
-}
+};
 
-function formatDistance(m: number): string {
+const formatDistance = (m: number): string => {
   return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`;
-}
+};
 
-function formatElevation(m: number): string {
+const formatElevation = (m: number): string => {
   return `${Math.round(m)} m`;
-}
+};
 
-function MemberAvatarsSkeleton({ count }: { count: number }) {
+const MemberAvatarsSkeleton = ({ count }: { count: number }) => {
   const n = Math.min(count, 3);
   return (
     <div className="flex -space-x-1.5">
@@ -68,9 +68,9 @@ function MemberAvatarsSkeleton({ count }: { count: number }) {
       )}
     </div>
   );
-}
+};
 
-function MemberAvatars({ group, loading }: { group: Group; loading?: boolean }) {
+const MemberAvatars = ({ group, loading }: { group: Group; loading?: boolean }) => {
   const memberCount = group.member_count ?? 0;
   const members = group.members ?? [];
 
@@ -102,9 +102,9 @@ function MemberAvatars({ group, loading }: { group: Group; loading?: boolean }) 
       )}
     </div>
   );
-}
+};
 
-export function GroupCard({ group, onClick, membersLoading }: { group: Group; onClick: () => void; membersLoading?: boolean }) {
+export const GroupCard = ({ group, onClick, membersLoading }: { group: Group; onClick: () => void; membersLoading?: boolean }) => {
   const ref = useRef<HTMLButtonElement>(null);
   const url = useSignedUrl(group, ref);
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -175,4 +175,4 @@ export function GroupCard({ group, onClick, membersLoading }: { group: Group; on
       </div>
     </button>
   );
-}
+};

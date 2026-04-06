@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
 
-export function SetupProfilePage() {
+export const SetupProfilePage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const next = searchParams.get('next') || '/';
@@ -87,4 +87,4 @@ export function SetupProfilePage() {
       </p>
     </div>
   );
-}
+};

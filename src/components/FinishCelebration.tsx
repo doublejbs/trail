@@ -6,9 +6,9 @@ interface Props {
   onClose: () => void;
 }
 
-function randomBetween(a: number, b: number) {
+const randomBetween = (a: number, b: number) => {
   return a + Math.random() * (b - a);
-}
+};
 
 interface Particle {
   x: number;
@@ -25,7 +25,7 @@ interface Particle {
 
 const COLORS = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#F7DC6F', '#BB8FCE', '#FF5722', '#00BCD4'];
 
-export function FinishCelebration({ elapsedTime, distanceKm, onClose }: Props) {
+export const FinishCelebration = ({ elapsedTime, distanceKm, onClose }: Props) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [show, setShow] = useState(false);
 
@@ -156,4 +156,4 @@ export function FinishCelebration({ elapsedTime, distanceKm, onClose }: Props) {
       </div>
     </div>
   );
-}
+};

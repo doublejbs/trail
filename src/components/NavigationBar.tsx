@@ -8,7 +8,7 @@ interface NavigationBarProps {
   rightAction?: ReactNode;
 }
 
-export function NavigationBar({ title, onBack, overlay = false, rightAction }: NavigationBarProps) {
+export const NavigationBar = ({ title, onBack, overlay = false, rightAction }: NavigationBarProps) => {
   return (
     <div
       className={[
@@ -33,4 +33,4 @@ export function NavigationBar({ title, onBack, overlay = false, rightAction }: N
       </div>
     </div>
   );
-}
+};

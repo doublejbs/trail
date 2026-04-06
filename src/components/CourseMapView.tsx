@@ -5,18 +5,18 @@ import { MapStore } from '../stores/MapStore';
 import { supabase } from '../lib/supabase';
 import type { Course } from '../types/course';
 
-function formatDistance(m: number | null): string {
+const formatDistance = (m: number | null): string => {
   if (m === null) return '—';
   if (m >= 1000) return `${(m / 1000).toFixed(1)} km`;
   return `${m} m`;
-}
+};
 
 interface Props {
   courses: Course[];
   onClose: () => void;
 }
 
-export function CourseMapView({ courses, onClose }: Props) {
+export const CourseMapView = ({ courses, onClose }: Props) => {
   const navigate = useNavigate();
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapStore] = useState(() => new MapStore());
@@ -272,4 +272,4 @@ export function CourseMapView({ courses, onClose }: Props) {
       </div>
     </div>
   );
-}
+};

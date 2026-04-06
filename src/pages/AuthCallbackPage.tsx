@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AuthCallbackStore } from "../stores/AuthCallbackStore";
 
-export function AuthCallbackPage() {
+export const AuthCallbackPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [store] = useState(() => new AuthCallbackStore(navigate));
@@ -25,4 +25,4 @@ export function AuthCallbackPage() {
       <div className="h-8 w-8 animate-spin rounded-full border-4 border-neutral-900 border-t-transparent" />
     </div>
   );
-}
+};

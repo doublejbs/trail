@@ -17,7 +17,7 @@ import { InvitePage } from './pages/InvitePage';
 import { SetupProfilePage } from './pages/SetupProfilePage';
 import { CheckpointEditPage } from './pages/CheckpointEditPage';
 
-export default function App() {
+const App = () => {
   return (
     <BrowserRouter>
       <Routes>
@@ -52,4 +52,6 @@ export default function App() {
       </Routes>
     </BrowserRouter>
   );
-}
+};
+
+export default App;

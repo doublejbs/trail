@@ -18,7 +18,7 @@ interface Props {
   currentDistanceKm?: number;
 }
 
-export function ElevationChart({ gpxText, onActiveCoord, currentDistanceKm }: Props) {
+export const ElevationChart = ({ gpxText, onActiveCoord, currentDistanceKm }: Props) => {
   // DOM refs — 드래그 중 React state 업데이트 없이 직접 조작
   const lineRef = useRef<HTMLDivElement>(null);
   const labelRef = useRef<HTMLDivElement>(null);
@@ -147,4 +147,4 @@ export function ElevationChart({ gpxText, onActiveCoord, currentDistanceKm }: Pr
       </div>
     </div>
   );
-}
+};

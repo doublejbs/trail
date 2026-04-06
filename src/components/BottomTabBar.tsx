@@ -26,11 +26,11 @@ const TABS: Tab[] = [
   },
 ];
 
-function isActive(tabPath: string, currentPath: string): boolean {
+const isActive = (tabPath: string, currentPath: string): boolean => {
   return currentPath.startsWith(tabPath);
-}
+};
 
-export function BottomTabBar() {
+export const BottomTabBar = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -62,4 +62,4 @@ export function BottomTabBar() {
       </div>
     </nav>
   );
-}
+};

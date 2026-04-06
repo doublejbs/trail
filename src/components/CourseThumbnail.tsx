@@ -8,7 +8,7 @@ interface Props {
   className?: string;
 }
 
-export function CourseThumbnail({ course, size = 56, className = '' }: Props) {
+export const CourseThumbnail = ({ course, size = 56, className = '' }: Props) => {
   const ref = useRef<HTMLDivElement>(null);
   const [url, setUrl] = useState<string | null>(null);
 
@@ -45,4 +45,4 @@ export function CourseThumbnail({ course, size = 56, className = '' }: Props) {
       )}
     </div>
   );
-}
+};
