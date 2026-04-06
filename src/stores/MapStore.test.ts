@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MapStore } from './MapStore';
 import { MapRenderingStore } from './MapRenderingStore';
+import { getCurrentPosition, watchPosition, clearWatch } from '../lib/geolocation';
+
+vi.mock('../lib/geolocation', () => ({
+  getCurrentPosition: vi.fn(),
+  watchPosition: vi.fn(),
+  clearWatch: vi.fn(),
+  requestPermission: vi.fn().mockResolvedValue(true),
+}));
 
 const mockPolyline = { setMap: vi.fn() };
 const mockStartMarker = { setMap: vi.fn() };
@@ -101,40 +109,28 @@ describe('MapStore', () => {
 
   describe('locate()', () => {
     it('does nothing when map is null', () => {
-      const getSpy = vi.spyOn(navigator.geolocation, 'getCurrentPosition');
       store.locate();
-      expect(getSpy).not.toHaveBeenCalled();
-    });
-
-    it('does nothing when navigator.geolocation is absent', () => {
-      (window as unknown as Record<string, unknown>).naver = { maps: mockNaverMaps };
-      const div = document.createElement('div');
-      store.initMap(div);
-      const originalGeolocation = navigator.geolocation;
-      Object.defineProperty(navigator, 'geolocation', { value: undefined, configurable: true });
-      store.locate();
-      // no error thrown — method exits silently
-      Object.defineProperty(navigator, 'geolocation', { value: originalGeolocation, configurable: true });
+      expect(getCurrentPosition).not.toHaveBeenCalled();
     });
 
     it('calls getCurrentPosition when map is set', () => {
       (window as unknown as Record<string, unknown>).naver = { maps: mockNaverMaps };
       const div = document.createElement('div');
       store.initMap(div);
-      const getSpy = vi.spyOn(navigator.geolocation, 'getCurrentPosition').mockImplementation(() => {});
+      vi.mocked(getCurrentPosition).mockResolvedValue({ latitude: 37.1, longitude: 127.1 });
       store.locate();
-      expect(getSpy).toHaveBeenCalledOnce();
+      expect(getCurrentPosition).toHaveBeenCalledOnce();
     });
 
-    it('calls map.setCenter with current position', () => {
+    it('calls map.setCenter with current position', async () => {
       (window as unknown as Record<string, unknown>).naver = { maps: mockNaverMaps };
       const div = document.createElement('div');
       store.initMap(div);
-      vi.spyOn(navigator.geolocation, 'getCurrentPosition').mockImplementation((cb) => {
-        cb({ coords: { latitude: 37.1, longitude: 127.1 } } as GeolocationPosition);
-      });
+      vi.mocked(getCurrentPosition).mockResolvedValue({ latitude: 37.1, longitude: 127.1 });
       store.locate();
-      expect(mockMap.setCenter).toHaveBeenCalledWith({ lat: 37.1, lng: 127.1 });
+      await vi.waitFor(() => {
+        expect(mockMap.setCenter).toHaveBeenCalledWith({ lat: 37.1, lng: 127.1 });
+      });
     });
   });
 
@@ -226,12 +222,12 @@ describe('MapStore', () => {
         expect(renderingStore.gpxPolyline).toBeNull();
       });
 
-      it('MapStore destroy() 호출 시 clearWatch 호출', () => {
-        const clearSpy = vi.spyOn(navigator.geolocation, 'clearWatch').mockImplementation(() => {});
-        vi.spyOn(navigator.geolocation, 'watchPosition').mockReturnValue(42);
+      it('MapStore destroy() 호출 시 clearWatch 호출', async () => {
+        vi.mocked(watchPosition).mockImplementation(async (_cb) => '42');
         store.startWatchingLocation();
+        await vi.waitFor(() => { expect(store['watchId']).toBe('42'); });
         store.destroy();
-        expect(clearSpy).toHaveBeenCalledWith(42);
+        expect(clearWatch).toHaveBeenCalledWith('42');
       });
     });
 
@@ -296,12 +292,10 @@ describe('MapStore', () => {
   });
 
   describe('startWatchingLocation()', () => {
-    let watchSpy: ReturnType<typeof vi.spyOn>;
-
     beforeEach(() => {
       const defaultLocationMarker = { setMap: vi.fn(), setPosition: vi.fn() };
       mockNaverMaps.Marker.mockImplementation(function () { return defaultLocationMarker; });
-      watchSpy = vi.spyOn(navigator.geolocation, 'watchPosition').mockImplementation(() => 42);
+      vi.mocked(watchPosition).mockImplementation(async (_cb) => '42');
       (window as unknown as Record<string, unknown>).naver = { maps: mockNaverMaps };
       store = new MapStore();
       store.initMap(document.createElement('div'));
@@ -309,19 +303,19 @@ describe('MapStore', () => {
 
     it('map이 있으면 watchPosition 호출', () => {
       store.startWatchingLocation();
-      expect(watchSpy).toHaveBeenCalledOnce();
+      expect(watchPosition).toHaveBeenCalledOnce();
     });
 
     it('map이 null이면 watchPosition 미호출', () => {
       store = new MapStore(); // map이 null인 새 store
       store.startWatchingLocation();
-      expect(watchSpy).not.toHaveBeenCalled();
+      expect(watchPosition).not.toHaveBeenCalled();
     });
 
     it('위치 콜백에서 setCenter 미호출', () => {
-      watchSpy.mockImplementation((cb: (pos: GeolocationPosition) => void) => {
-        cb({ coords: { latitude: 37.1, longitude: 127.1 } } as GeolocationPosition);
-        return 42;
+      vi.mocked(watchPosition).mockImplementation(async (cb) => {
+        cb({ latitude: 37.1, longitude: 127.1 });
+        return '42';
       });
       store.startWatchingLocation();
       expect(mockMap.setCenter).not.toHaveBeenCalled();
@@ -330,9 +324,9 @@ describe('MapStore', () => {
     it('위치 콜백에서 Marker 생성', () => {
       const mockLocationMarker = { setMap: vi.fn(), setPosition: vi.fn() };
       mockNaverMaps.Marker.mockImplementation(function () { return mockLocationMarker; });
-      watchSpy.mockImplementation((cb: (pos: GeolocationPosition) => void) => {
-        cb({ coords: { latitude: 37.1, longitude: 127.1 } } as GeolocationPosition);
-        return 42;
+      vi.mocked(watchPosition).mockImplementation(async (cb) => {
+        cb({ latitude: 37.1, longitude: 127.1 });
+        return '42';
       });
       store.startWatchingLocation();
       expect(store.locationMarker).not.toBeNull();
@@ -341,33 +335,33 @@ describe('MapStore', () => {
     it('두 번째 위치 콜백에서 새 마커 생성 없이 setPosition 호출', () => {
       const mockLocationMarker = { setMap: vi.fn(), setPosition: vi.fn() };
       mockNaverMaps.Marker.mockImplementation(function () { return mockLocationMarker; });
-      let cbRef: ((pos: GeolocationPosition) => void) | null = null;
-      watchSpy.mockImplementation((cb: (pos: GeolocationPosition) => void) => {
-        cbRef = cb as (pos: GeolocationPosition) => void;
-        cb({ coords: { latitude: 37.1, longitude: 127.1 } } as GeolocationPosition);
-        return 42;
+      let cbRef: ((pos: { latitude: number; longitude: number }) => void) | null = null;
+      vi.mocked(watchPosition).mockImplementation(async (cb) => {
+        cbRef = cb;
+        cb({ latitude: 37.1, longitude: 127.1 });
+        return '42';
       });
       store.startWatchingLocation();
       const markerCallsBefore = (mockNaverMaps.Marker as ReturnType<typeof vi.fn>).mock.calls.length;
-      cbRef!({ coords: { latitude: 37.2, longitude: 127.2 } } as GeolocationPosition);
+      cbRef!({ latitude: 37.2, longitude: 127.2 });
       expect((mockNaverMaps.Marker as ReturnType<typeof vi.fn>).mock.calls.length).toBe(markerCallsBefore);
       expect(mockLocationMarker.setPosition).toHaveBeenCalledWith({ lat: 37.2, lng: 127.2 });
     });
 
     it('onLocationUpdate 콜백이 올바른 좌표로 호출됨', () => {
       const callback = vi.fn();
-      watchSpy.mockImplementation((cb: (pos: GeolocationPosition) => void) => {
-        cb({ coords: { latitude: 37.1, longitude: 127.1 } } as GeolocationPosition);
-        return 42;
+      vi.mocked(watchPosition).mockImplementation(async (cb) => {
+        cb({ latitude: 37.1, longitude: 127.1 });
+        return '42';
       });
       store.startWatchingLocation(callback);
       expect(callback).toHaveBeenCalledWith(37.1, 127.1);
     });
 
     it('콜백 없이 호출해도 기존 동작 유지', () => {
-      watchSpy.mockImplementation((cb: (pos: GeolocationPosition) => void) => {
-        cb({ coords: { latitude: 37.1, longitude: 127.1 } } as GeolocationPosition);
-        return 42;
+      vi.mocked(watchPosition).mockImplementation(async (cb) => {
+        cb({ latitude: 37.1, longitude: 127.1 });
+        return '42';
       });
       expect(() => store.startWatchingLocation()).not.toThrow();
       expect(store.locationMarker).not.toBeNull();
@@ -375,12 +369,8 @@ describe('MapStore', () => {
   });
 
   describe('stopWatchingLocation()', () => {
-    let watchSpy: ReturnType<typeof vi.spyOn>;
-    let clearSpy: ReturnType<typeof vi.spyOn>;
-
     beforeEach(() => {
-      watchSpy = vi.spyOn(navigator.geolocation, 'watchPosition').mockReturnValue(42);
-      clearSpy = vi.spyOn(navigator.geolocation, 'clearWatch').mockImplementation(() => {});
+      vi.mocked(watchPosition).mockImplementation(async (_cb) => '42');
       const mockLocationMarker = { setMap: vi.fn(), setPosition: vi.fn() };
       mockNaverMaps.Marker.mockImplementation(function () { return mockLocationMarker; });
       (window as unknown as Record<string, unknown>).naver = { maps: mockNaverMaps };
@@ -388,21 +378,22 @@ describe('MapStore', () => {
       store.initMap(document.createElement('div'));
     });
 
-    it('clearWatch 호출 + 마커 제거', () => {
+    it('clearWatch 호출 + 마커 제거', async () => {
       // 위치 콜백으로 마커 먼저 생성
-      watchSpy.mockImplementation((cb: (pos: GeolocationPosition) => void) => {
-        cb({ coords: { latitude: 37.1, longitude: 127.1 } } as GeolocationPosition);
-        return 42;
+      vi.mocked(watchPosition).mockImplementation(async (cb) => {
+        cb({ latitude: 37.1, longitude: 127.1 });
+        return '42';
       });
       store.startWatchingLocation();
+      await vi.waitFor(() => { expect(store['watchId']).toBe('42'); });
       store.stopWatchingLocation();
-      expect(clearSpy).toHaveBeenCalledWith(42);
+      expect(clearWatch).toHaveBeenCalledWith('42');
       expect(store.locationMarker).toBeNull();
     });
 
     it('watchId가 null이면 clearWatch 미호출', () => {
       store.stopWatchingLocation();
-      expect(clearSpy).not.toHaveBeenCalled();
+      expect(clearWatch).not.toHaveBeenCalled();
     });
   });
 
