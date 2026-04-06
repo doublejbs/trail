@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button';
 import { Crosshair, Trophy, X, Settings, TrendingUp } from 'lucide-react';
 import { ElevationChart } from '../components/ElevationChart';
 import { MapStore } from '../stores/MapStore';
-import { MemberMarkerStore } from '../stores/MemberMarkerStore';
 import { GroupMapStore } from '../stores/GroupMapStore';
 import { TrackingStore } from '../stores/TrackingStore';
 import { LeaderboardStore } from '../stores/LeaderboardStore';
@@ -24,7 +23,6 @@ export const GroupMapPage = observer(() => {
   const navigate = useNavigate();
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapStore] = useState(() => new MapStore());
-  const [memberMarkerStore] = useState(() => new MemberMarkerStore(() => mapStore.map));
   const [store] = useState(() => new GroupMapStore(navigate));
   const [trackingStore] = useState(() => new TrackingStore(id!, []));
   const [leaderboardStore] = useState(() => new LeaderboardStore(id!));
@@ -149,12 +147,12 @@ export const GroupMapPage = observer(() => {
       leaderboardStore.rankings.forEach((r) => {
         if (r.userId === store.currentUserId) return;
         if (r.lat != null && r.lng != null) {
-          memberMarkerStore.updateMemberMarker(r.userId, r.displayName, r.lat, r.lng, r.avatarUrl);
+          mapStore.updateMemberMarker(r.userId, r.displayName, r.lat, r.lng, r.avatarUrl);
         }
       });
     });
     return disposer;
-  }, [leaderboardStore, mapStore, memberMarkerStore, store]);
+  }, [leaderboardStore, mapStore, store]);
 
   // 체크포인트 마커 렌더링
   useEffect(() => {
