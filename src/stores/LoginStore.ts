@@ -1,4 +1,6 @@
 import { makeAutoObservable, runInAction } from 'mobx';
+import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
 import { toast } from 'sonner';
 import { supabase } from '../lib/supabase';
 
@@ -15,11 +17,22 @@ class LoginStore {
     runInAction(() => { this.loadingProvider = provider; });
     try {
       const providerKey = provider === 'naver' ? 'custom:naver' : provider;
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: providerKey as 'google',
-        options: { redirectTo },
-      });
-      if (error) throw error;
+      if (Capacitor.isNativePlatform()) {
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: providerKey as 'google',
+          options: { redirectTo: 'com.trail.app://auth/callback', skipBrowserRedirect: true },
+        });
+        if (error) throw error;
+        if (data.url) {
+          await Browser.open({ url: data.url, presentationStyle: 'popover' });
+        }
+      } else {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: providerKey as 'google',
+          options: { redirectTo },
+        });
+        if (error) throw error;
+      }
     } catch {
       runInAction(() => { this.loadingProvider = null; });
       toast.error('잠시 후 다시 시도해주세요');

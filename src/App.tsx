@@ -1,12 +1,27 @@
 import { Capacitor } from '@capacitor/core';
+import { App as CapApp } from '@capacitor/app';
+import { Browser } from '@capacitor/browser';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { SplashScreen } from '@capacitor/splash-screen';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { supabase } from './lib/supabase';
 
 if (Capacitor.isNativePlatform()) {
   StatusBar.setStyle({ style: Style.Light });
   StatusBar.setBackgroundColor({ color: '#ffffff' });
   SplashScreen.hide();
+
+  CapApp.addListener('appUrlOpen', async ({ url }: { url: string }) => {
+    if (url.includes('auth/callback')) {
+      const parsed = new URL(url);
+      const code = parsed.searchParams.get('code');
+      if (code) {
+        await supabase.auth.exchangeCodeForSession(code);
+        await Browser.close();
+        window.location.href = '/';
+      }
+    }
+  });
 }
 
 import { ProtectedRoute } from './components/ProtectedRoute';

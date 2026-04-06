@@ -49,5 +49,16 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>트래킹을 위해 위치 정보가 필요합니다</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.trail.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.trail.app</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
