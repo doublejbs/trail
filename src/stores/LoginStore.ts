@@ -24,6 +24,9 @@ class LoginStore {
         });
         if (error) throw error;
         if (data.url) {
+          console.log('[OAuth] redirectTo:', redirectTo);
+          console.log('[OAuth] url:', data.url);
+          alert(`redirectTo: ${redirectTo}\n\nOAuth URL: ${data.url.substring(0, 200)}`);
           await Browser.open({ url: data.url });
         }
       } else {
