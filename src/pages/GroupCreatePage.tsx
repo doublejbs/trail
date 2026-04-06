@@ -5,12 +5,14 @@ import { MapPin, TrendingUp, Check } from 'lucide-react';
 import { NavigationBar } from '../components/NavigationBar';
 import { GroupCreateStore } from '../stores/GroupCreateStore';
 import { MapStore } from '../stores/MapStore';
+import { MapRenderingStore } from '../stores/MapRenderingStore';
 import { CourseThumbnail } from '../components/CourseThumbnail';
 
 export const GroupCreatePage = observer(() => {
   const navigate = useNavigate();
   const [store] = useState(() => new GroupCreateStore(navigate));
   const [mapStore] = useState(() => new MapStore());
+  const [renderingStore] = useState(() => new MapRenderingStore(() => mapStore.map));
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapReady, setMapReady] = useState(false);
   const [gpxText, setGpxText] = useState<string | null>(null);
@@ -25,15 +27,15 @@ export const GroupCreatePage = observer(() => {
     if (store.sourceMode !== 'file' || !mapRef.current) return;
     mapStore.initMap(mapRef.current);
     setMapReady(true);
-    return () => { mapStore.destroy(); setMapReady(false); };
-  }, [mapStore, store.sourceMode]);
+    return () => { renderingStore.destroy(); mapStore.destroy(); setMapReady(false); };
+  }, [mapStore, renderingStore, store.sourceMode]);
 
   // Draw route when GPX is loaded
   useEffect(() => {
     if (mapReady && gpxText) {
-      mapStore.drawGpxRoute(gpxText);
+      renderingStore.drawGpxRoute(gpxText);
     }
-  }, [mapStore, mapReady, gpxText]);
+  }, [renderingStore, mapReady, gpxText]);
 
 const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0] ?? null;

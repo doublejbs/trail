@@ -2,6 +2,7 @@ import { useRef, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, MapPin, TrendingUp, ArrowRight, Crosshair, Search } from 'lucide-react';
 import { MapStore } from '../stores/MapStore';
+import { MapRenderingStore } from '../stores/MapRenderingStore';
 import { supabase } from '../lib/supabase';
 import type { Course } from '../types/course';
 
@@ -20,6 +21,7 @@ export const CourseMapView = ({ courses, onClose }: Props) => {
   const navigate = useNavigate();
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapStore] = useState(() => new MapStore());
+  const [renderingStore] = useState(() => new MapRenderingStore(() => mapStore.map));
   const [selected, setSelected] = useState<Course | null>(null);
   const [, setGpxText] = useState<string | null>(null);
   const [gpxLoading, setGpxLoading] = useState(false);
@@ -38,8 +40,8 @@ export const CourseMapView = ({ courses, onClose }: Props) => {
   useEffect(() => {
     if (!mapRef.current) return;
     mapStore.initMap(mapRef.current);
-    return () => mapStore.destroy();
-  }, [mapStore]);
+    return () => { renderingStore.destroy(); mapStore.destroy(); };
+  }, [mapStore, renderingStore]);
 
   // 핀 렌더링
   useEffect(() => {
@@ -93,7 +95,7 @@ export const CourseMapView = ({ courses, onClose }: Props) => {
   // 선택된 코스 GPX 로드 및 경로 표시
   useEffect(() => {
     if (!selected) {
-      mapStore.clearGpxRoute();
+      renderingStore.clearGpxRoute();
       setGpxText(null);
       return;
     }
@@ -101,7 +103,7 @@ export const CourseMapView = ({ courses, onClose }: Props) => {
     let cancelled = false;
     setGpxLoading(true);
     setGpxText(null);
-    mapStore.clearGpxRoute();
+    renderingStore.clearGpxRoute();
 
     (async () => {
       const { data, error } = await supabase.storage
@@ -115,8 +117,8 @@ export const CourseMapView = ({ courses, onClose }: Props) => {
         const text = await res.text();
         if (cancelled) return;
         setGpxText(text);
-        mapStore.drawGpxRoute(text);
-        mapStore.returnToCourse();
+        renderingStore.drawGpxRoute(text);
+        renderingStore.returnToCourse();
       } catch {
         // silent
       } finally {

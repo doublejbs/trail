@@ -4,6 +4,7 @@ import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
 import { NavigationBar } from '../components/NavigationBar';
 import { MapStore } from '../stores/MapStore';
+import { MapRenderingStore } from '../stores/MapRenderingStore';
 import { GroupSettingsStore } from '../stores/GroupSettingsStore';
 import { parseGpxPoints } from '../utils/routeProjection';
 import { snapToRoute } from '../utils/snapToRoute';
@@ -16,6 +17,7 @@ export const CheckpointEditPage = observer(() => {
   const navigate = useNavigate();
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapStore] = useState(() => new MapStore());
+  const [renderingStore] = useState(() => new MapRenderingStore(() => mapStore.map));
   const [store] = useState(() => new GroupSettingsStore(navigate));
   const [gpxText, setGpxText] = useState<string | null>(null);
   const [editingCp, setEditingCp] = useState<Checkpoint | null>(null);
@@ -60,8 +62,8 @@ export const CheckpointEditPage = observer(() => {
   useEffect(() => {
     if (!mapRef.current || !gpxText) return;
     mapStore.initMap(mapRef.current);
-    mapStore.drawGpxRoute(gpxText);
-    return () => { mapStore.destroy(); };
+    renderingStore.drawGpxRoute(gpxText);
+    return () => { renderingStore.destroy(); mapStore.destroy(); };
   }, [mapStore, gpxText]);
 
   // 체크포인트 마커 그리기

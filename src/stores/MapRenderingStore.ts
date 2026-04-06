@@ -18,7 +18,10 @@ class MapRenderingStore {
   private _checkpointCircles: Map<string, naver.maps.Circle> = new Map();
   private _onCheckpointTap: ((checkpointId: string) => void) | null = null;
 
-  public constructor(private getMap: () => naver.maps.Map | null) {
+  private getMap: () => naver.maps.Map | null;
+
+  public constructor(getMap: () => naver.maps.Map | null) {
+    this.getMap = getMap;
     makeAutoObservable(this, {
       gpxPolyline: observable.ref,
       startMarker: observable.ref,

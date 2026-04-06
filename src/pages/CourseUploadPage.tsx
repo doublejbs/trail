@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Upload } from 'lucide-react';
 import { CourseUploadStore } from '../stores/CourseUploadStore';
 import { MapStore } from '../stores/MapStore';
+import { MapRenderingStore } from '../stores/MapRenderingStore';
 import { NavigationBar } from '../components/NavigationBar';
 
 const DIFFICULTY_TAGS = ['쉬움', '보통', '어려움'];
@@ -15,6 +16,7 @@ export const CourseUploadPage = observer(() => {
   const navigate = useNavigate();
   const [store] = useState(() => new CourseUploadStore());
   const [mapStore] = useState(() => new MapStore());
+  const [renderingStore] = useState(() => new MapRenderingStore(() => mapStore.map));
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapReady, setMapReady] = useState(false);
   const [gpxText, setGpxText] = useState<string | null>(null);
@@ -23,14 +25,14 @@ export const CourseUploadPage = observer(() => {
     if (!mapRef.current) return;
     mapStore.initMap(mapRef.current);
     setMapReady(true);
-    return () => mapStore.destroy();
-  }, [mapStore]);
+    return () => { renderingStore.destroy(); mapStore.destroy(); };
+  }, [mapStore, renderingStore]);
 
   useEffect(() => {
     if (mapReady && gpxText) {
-      mapStore.drawGpxRoute(gpxText);
+      renderingStore.drawGpxRoute(gpxText);
     }
-  }, [mapStore, mapReady, gpxText]);
+  }, [renderingStore, mapReady, gpxText]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0] ?? null;
