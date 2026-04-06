@@ -23,21 +23,19 @@ class MapStore {
 
     const clientId = import.meta.env.VITE_NAVER_MAP_CLIENT_ID;
     if (!clientId) {
-      console.warn("VITE_NAVER_MAP_CLIENT_ID is not set");
+      alert('[Map Debug] VITE_NAVER_MAP_CLIENT_ID is not set');
       this.error = true;
       return;
     }
 
     if (!window.naver?.maps?.Map) {
-      console.error(
-        "Naver Maps SDK not loaded — check script tag and API key authorization for this domain",
-      );
+      alert(`[Map Debug] Naver Maps SDK not loaded. window.naver=${typeof (window as unknown as Record<string, unknown>).naver}, origin=${window.location.origin}`);
       this.error = true;
       return;
     }
 
     (window as Window & { navermap_authFailure?: () => void }).navermap_authFailure = () => {
-      console.error("Naver Maps auth failed — check API key and authorized domains in NCP console");
+      alert(`[Map Auth Failed] origin=${window.location.origin}, href=${window.location.href}`);
       runInAction(() => { this.error = true; });
     };
 
