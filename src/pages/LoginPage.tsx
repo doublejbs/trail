@@ -23,14 +23,11 @@ export const LoginPage = observer(() => {
 
   const handleLogin = (provider: 'google' | 'kakao') => {
     const isNative = Capacitor.isNativePlatform();
-    const origin = isNative
-      ? 'https://trail-five.vercel.app'
-      : window.location.origin;
-    const base = `${origin}/auth/callback`;
-    const params = new URLSearchParams();
-    if (next) params.set('next', next);
-    if (isNative) params.set('native', '1');
-    const redirectTo = params.toString() ? `${base}?${params}` : base;
+    const redirectTo = isNative
+      ? 'https://trail-five.vercel.app/auth/native-callback.html'
+      : next
+        ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`
+        : `${window.location.origin}/auth/callback`;
     store.login(provider, redirectTo);
   };
 

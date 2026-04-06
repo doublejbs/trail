@@ -13,18 +13,8 @@ export const AuthCallbackPage = () => {
     : "/";
 
   useEffect(() => {
-    const code = searchParams.get("code");
-    const isNativeCallback = searchParams.get("native") === "1";
-
-    // 네이티브 앱에서 인앱 브라우저로 OAuth 진행 후 콜백:
-    // 커스텀 스킴으로 네이티브 앱에 code를 전달하여 앱으로 복귀
-    if (code && isNativeCallback) {
-      window.location.href = `com.trail.app://auth/callback?code=${code}`;
-      return;
-    }
-
     store.handleCallback(next);
-  }, [store, next, searchParams]);
+  }, [store, next]);
 
   return (
     <div

@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Redirecting...</title></head>
+<body>
+<script>
+  var params = new URLSearchParams(window.location.search);
+  var code = params.get('code');
+  if (code) {
+    window.location.href = 'com.trail.app://auth/callback?code=' + encodeURIComponent(code);
+  }
+</script>
+</body>
+</html>
