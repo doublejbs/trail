@@ -11,10 +11,12 @@ import { snapToRoute } from '../utils/snapToRoute';
 import { supabase } from '../lib/supabase';
 import type { Checkpoint } from '../types/checkpoint';
 import type { Group } from '../types/group';
+import { useSafeBack } from '../hooks/useSafeBack';
 
 export const CheckpointEditPage = observer(() => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const safeBack = useSafeBack();
   const mapRef = useRef<HTMLDivElement>(null);
   const [mapStore] = useState(() => new MapStore());
   const [renderingStore] = useState(() => new MapRenderingStore(() => mapStore.map));
@@ -238,7 +240,7 @@ export const CheckpointEditPage = observer(() => {
     <div className="absolute inset-0 flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <NavigationBar
         title="체크포인트 편집"
-        onBack={() => navigate(-1)}
+        onBack={safeBack}
       />
       <div className="flex-1 relative overflow-hidden">
         <div ref={mapRef} className="absolute inset-0 w-full h-full" />

@@ -10,10 +10,12 @@ import { MapRenderingStore } from '../stores/MapRenderingStore';
 import { CourseDetailUIStore } from '../stores/ui/CourseDetailUIStore';
 import { NavigationBar } from '../components/NavigationBar';
 import { ElevationChart } from '../components/ElevationChart';
+import { useSafeBack } from '../hooks/useSafeBack';
 
 export const CourseDetailPage = observer(() => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const safeBack = useSafeBack();
   const [store] = useState(() => new CourseDetailStore(id!));
   const [mapStore] = useState(() => new MapStore());
   const [renderingStore] = useState(() => new MapRenderingStore(() => mapStore.map));
@@ -108,7 +110,7 @@ export const CourseDetailPage = observer(() => {
 
   return (
     <div className="absolute inset-0 flex flex-col bg-white">
-      <NavigationBar title="" onBack={() => navigate(-1)} />
+      <NavigationBar title="" onBack={safeBack} />
 
       {/* Map */}
       <div className="shrink-0 relative" style={{ height: MAP_HEIGHT }}>

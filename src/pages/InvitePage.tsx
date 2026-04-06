@@ -3,6 +3,7 @@ import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { observer } from "mobx-react-lite";
 import { JoinGroupStore } from "../stores/JoinGroupStore";
 import { NavigationBar } from "../components/NavigationBar";
+import { useSafeBack } from "../hooks/useSafeBack";
 import { supabase } from "../lib/supabase";
 
 const GroupThumbnail = ({
@@ -40,6 +41,7 @@ const GroupThumbnail = ({
 export const InvitePage = observer(() => {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
+  const safeBack = useSafeBack();
   const [store] = useState(() => new JoinGroupStore(navigate));
 
   useEffect(() => {
@@ -49,7 +51,7 @@ export const InvitePage = observer(() => {
   if (!store.sessionChecked) {
     return (
       <div className="flex flex-col h-screen bg-white">
-        <NavigationBar title="그룹 참여" onBack={() => navigate(-1)} />
+        <NavigationBar title="그룹 참여" onBack={safeBack} />
         <div className="flex-1 flex items-center justify-center">
           <div className="w-5 h-5 border-2 border-black/15 border-t-black rounded-full animate-spin" />
         </div>
@@ -69,7 +71,7 @@ export const InvitePage = observer(() => {
   if (store.status === "loading" || store.status === "idle") {
     return (
       <div className="flex flex-col h-screen bg-white">
-        <NavigationBar title="그룹 참여" onBack={() => navigate(-1)} />
+        <NavigationBar title="그룹 참여" onBack={safeBack} />
         <div className="flex-1 flex items-center justify-center">
           <div className="w-5 h-5 border-2 border-black/15 border-t-black rounded-full animate-spin" />
         </div>
@@ -80,7 +82,7 @@ export const InvitePage = observer(() => {
   if (store.status === "invalid") {
     return (
       <div className="flex flex-col h-screen bg-white">
-        <NavigationBar title="그룹 참여" onBack={() => navigate(-1)} />
+        <NavigationBar title="그룹 참여" onBack={safeBack} />
         <div className="flex-1 flex flex-col items-center justify-center px-5 gap-3">
           <div className="w-14 h-14 rounded-full bg-black/[0.04] flex items-center justify-center mb-2">
             <span className="text-2xl">🔗</span>
@@ -99,7 +101,7 @@ export const InvitePage = observer(() => {
   if (store.status === "full") {
     return (
       <div className="flex flex-col h-screen bg-white">
-        <NavigationBar title="그룹 참여" onBack={() => navigate(-1)} />
+        <NavigationBar title="그룹 참여" onBack={safeBack} />
         <div className="flex-1 flex flex-col items-center justify-center px-5 gap-3">
           <div className="w-14 h-14 rounded-full bg-black/[0.04] flex items-center justify-center mb-2">
             <span className="text-2xl">👥</span>
@@ -119,7 +121,7 @@ export const InvitePage = observer(() => {
     const g = store.groupPreview;
     return (
       <div className="h-full flex flex-col bg-white">
-        <NavigationBar title="그룹 참여" onBack={() => navigate(-1)} />
+        <NavigationBar title="그룹 참여" onBack={safeBack} />
         <div className="flex-1 flex flex-col items-center justify-center px-5 gap-5">
           <GroupThumbnail path={g.thumbnail_path} bucket={g.gpx_bucket} />
           <div className="text-center">
@@ -149,7 +151,7 @@ export const InvitePage = observer(() => {
   if (store.status === "joining") {
     return (
       <div className="h-full flex flex-col bg-white">
-        <NavigationBar title="그룹 참여" onBack={() => navigate(-1)} />
+        <NavigationBar title="그룹 참여" onBack={safeBack} />
         <div className="flex-1 flex items-center justify-center">
           <div className="w-5 h-5 border-2 border-black/15 border-t-black rounded-full animate-spin" />
         </div>

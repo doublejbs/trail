@@ -5,10 +5,12 @@ import { toast } from 'sonner';
 import { Copy, Link, UserMinus, Play, Square, MapPin } from 'lucide-react';
 import { NavigationBar } from '../components/NavigationBar';
 import { GroupSettingsStore } from '../stores/GroupSettingsStore';
+import { useSafeBack } from '../hooks/useSafeBack';
 
 export const GroupSettingsPage = observer(() => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const safeBack = useSafeBack();
   const [store] = useState(() => new GroupSettingsStore(navigate));
 
   useEffect(() => {
@@ -56,7 +58,7 @@ export const GroupSettingsPage = observer(() => {
     <div className="absolute inset-0 overflow-y-auto bg-white">
       <NavigationBar
         title="설정"
-        onBack={() => navigate(-1)}
+        onBack={safeBack}
       />
 
       <div className="px-5 py-6 flex flex-col gap-6">

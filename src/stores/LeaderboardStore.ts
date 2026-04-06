@@ -164,9 +164,7 @@ class LeaderboardStore {
     }
 
     const channel = supabase.channel(`group-progress:${this.groupId}`);
-    console.log('[LeaderboardStore] subscribing to channel:', `group-progress:${this.groupId}`);
     channel.on('broadcast', { event: 'progress' }, (msg) => {
-      console.log('[LeaderboardStore] broadcast received:', msg.payload);
       const { userId, displayName, maxRouteMeters, lat, lng, checkpointsVisited } = msg.payload as {
         userId: string;
         displayName: string;

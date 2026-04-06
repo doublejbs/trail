@@ -11,11 +11,13 @@ import { Crosshair, Trophy, X, Settings, TrendingUp } from 'lucide-react';
 import { ElevationChart } from '../components/ElevationChart';
 import { totalRouteDistance } from '../utils/routeProjection';
 import { GroupMapUIStore } from '../stores/ui/GroupMapUIStore';
+import { useSafeBack } from '../hooks/useSafeBack';
 import type { Ranking } from '../stores/LeaderboardStore';
 
 export const GroupMapPage = observer(() => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const safeBack = useSafeBack();
   const mapRef = useRef<HTMLDivElement>(null);
   const [uiStore] = useState(() => new GroupMapUIStore(id!, navigate));
 
@@ -131,7 +133,7 @@ export const GroupMapPage = observer(() => {
     <div className="absolute inset-0 flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <NavigationBar
         title={groupMapStore.group.name}
-        onBack={() => navigate(-1)}
+        onBack={safeBack}
         rightAction={
           groupMapStore.currentUserId && groupMapStore.group && groupMapStore.currentUserId === groupMapStore.group.created_by ? (
             <button

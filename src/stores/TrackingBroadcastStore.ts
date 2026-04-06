@@ -92,19 +92,17 @@ class TrackingBroadcastStore {
     this._lastBroadcastLat = lat;
     this._lastBroadcastLng = lng;
 
-    const payload = {
-      userId: this._userId,
-      displayName: this.displayName,
-      maxRouteMeters: this.trackingStore.maxRouteMeters,
-      lat,
-      lng,
-      checkpointsVisited: this.trackingStore.visitedCheckpointIds.size,
-    };
-    console.log('[BroadcastStore] sending:', payload);
     void this._channel.send({
       type: 'broadcast',
       event: 'progress',
-      payload,
+      payload: {
+        userId: this._userId,
+        displayName: this.displayName,
+        maxRouteMeters: this.trackingStore.maxRouteMeters,
+        lat,
+        lng,
+        checkpointsVisited: this.trackingStore.visitedCheckpointIds.size,
+      },
     });
   }
 
