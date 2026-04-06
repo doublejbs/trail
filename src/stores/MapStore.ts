@@ -1,11 +1,12 @@
 import { makeAutoObservable, observable, runInAction } from "mobx";
+import { getCurrentPosition, watchPosition, clearWatch } from '../lib/geolocation';
 
 class MapStore {
   public map: naver.maps.Map | null = null;
   public error: boolean = false;
   public locationMarker: naver.maps.Marker | null = null;
 
-  private watchId: number | null = null;
+  private watchId: string | null = null;
   private lastPosition: { latitude: number; longitude: number } | null = null;
   private locationAvatarUrl: string | null = null;
   private _logoEl: HTMLDivElement | null = null;
@@ -98,20 +99,18 @@ class MapStore {
     if (this.lastPosition) {
       const { latitude, longitude } = this.lastPosition;
       this.map.setCenter(new window.naver.maps.LatLng(latitude, longitude));
-    } else if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords;
-          this.map!.setCenter(new window.naver.maps.LatLng(latitude, longitude));
-        },
-        (err) => { console.error('[locate] error', err.code, err.message); },
-      );
+    } else {
+      getCurrentPosition()
+        .then((pos) => {
+          this.map?.setCenter(new window.naver.maps.LatLng(pos.latitude, pos.longitude));
+        })
+        .catch((err) => { console.error('[locate] error', err); });
     }
   }
 
   public stopWatchingLocation(): void {
     if (this.watchId !== null) {
-      navigator.geolocation.clearWatch(this.watchId);
+      clearWatch(this.watchId);
       this.watchId = null;
     }
     this.locationMarker?.setMap(null);
@@ -158,14 +157,12 @@ class MapStore {
 
   public startWatchingLocation(onLocationUpdate?: (lat: number, lng: number) => void): void {
     if (!this.map) return;
-    if (!navigator.geolocation) return;
 
-    this.watchId = navigator.geolocation.watchPosition(
+    watchPosition(
       (pos) => {
-        this.lastPosition = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+        this.lastPosition = { latitude: pos.latitude, longitude: pos.longitude };
         if (!this.map) return;
-        const { latitude, longitude } = pos.coords;
-        const latLng = new window.naver.maps.LatLng(latitude, longitude);
+        const latLng = new window.naver.maps.LatLng(pos.latitude, pos.longitude);
 
         runInAction(() => {
           if (!this.locationMarker) {
@@ -184,10 +181,11 @@ class MapStore {
           }
         });
 
-        onLocationUpdate?.(latitude, longitude);
+        onLocationUpdate?.(pos.latitude, pos.longitude);
       },
-      () => { /* 에러 무시 */ },
-    );
+    ).then((id) => {
+      this.watchId = id;
+    });
   }
 }
 
