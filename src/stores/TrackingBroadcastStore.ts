@@ -38,7 +38,11 @@ class TrackingBroadcastStore {
       const channel = supabase.channel(`group-progress:${this.groupId}`, {
         config: { broadcast: { self: true } },
       });
-      channel.subscribe();
+      await new Promise<void>((resolve) => {
+        channel.subscribe((status) => {
+          if (status === 'SUBSCRIBED') resolve();
+        });
+      });
 
       runInAction(() => {
         this._userId = user.id;
