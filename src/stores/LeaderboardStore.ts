@@ -35,13 +35,23 @@ class LeaderboardStore {
     try {
       let query = supabase
         .from('tracking_sessions')
-        .select('user_id, max_route_meters')
+        .select('id, user_id, max_route_meters, created_at')
         .eq('group_id', this.groupId);
       if (periodStartedAt) {
         query = query.gte('created_at', periodStartedAt.toISOString());
       }
       const { data: sessions, error: sessionsError } = await query;
       if (sessionsError) throw sessionsError;
+
+      // 유저별 최신 세션 ID (체크포인트 집계용)
+      const latestSessionByUser = new Map<string, { id: string; createdAt: string }>();
+      for (const s of sessions ?? []) {
+        const prev = latestSessionByUser.get(s.user_id);
+        if (!prev || s.created_at > prev.createdAt) {
+          latestSessionByUser.set(s.user_id, { id: s.id, createdAt: s.created_at });
+        }
+      }
+      const latestSessionIds = [...latestSessionByUser.values()].map((v) => v.id);
 
       const maxByUser = new Map<string, number>();
       for (const row of sessions ?? []) {
@@ -70,16 +80,24 @@ class LeaderboardStore {
         }));
       }
 
-      // 체크포인트 통과 수 집계: 유저별 최대 세션의 통과 수
+      // 체크포인트 통과 수 집계: 현재 기간 세션 + 현재 존재하는 체크포인트만
       const checkpointCountMap = new Map<string, number>();
-      if (userIds.length > 0) {
-        const { data: visits } = await supabase
-          .from('checkpoint_visits')
-          .select('user_id, checkpoint_id')
-          .in('user_id', userIds);
+      if (latestSessionIds.length > 0) {
+        const [{ data: visits }, { data: currentCheckpoints }] = await Promise.all([
+          supabase
+            .from('checkpoint_visits')
+            .select('user_id, checkpoint_id')
+            .in('tracking_session_id', latestSessionIds),
+          supabase
+            .from('checkpoints')
+            .select('id')
+            .eq('group_id', this.groupId),
+        ]);
+        const validCpIds = new Set((currentCheckpoints ?? []).map((cp) => cp.id));
         if (visits) {
           const byUser = new Map<string, Set<string>>();
           for (const v of visits) {
+            if (!validCpIds.has(v.checkpoint_id)) continue;
             if (!byUser.has(v.user_id)) byUser.set(v.user_id, new Set());
             byUser.get(v.user_id)!.add(v.checkpoint_id);
           }
@@ -146,7 +164,9 @@ class LeaderboardStore {
     }
 
     const channel = supabase.channel(`group-progress:${this.groupId}`);
+    console.log('[LeaderboardStore] subscribing to channel:', `group-progress:${this.groupId}`);
     channel.on('broadcast', { event: 'progress' }, (msg) => {
+      console.log('[LeaderboardStore] broadcast received:', msg.payload);
       const { userId, displayName, maxRouteMeters, lat, lng, checkpointsVisited } = msg.payload as {
         userId: string;
         displayName: string;
