@@ -13,7 +13,7 @@ if (Capacitor.isNativePlatform()) {
 
   // OAuth 딥링크 리스너: 외부 브라우저에서 앱으로 돌아올 때 URL을 Supabase에 전달
   CapApp.addListener('appUrlOpen', ({ url }: { url: string }) => {
-    if (url.includes('auth/callback')) {
+    if (url.includes('auth/callback') || url.includes('com.trail.app://auth/callback')) {
       Browser.close();
       const parsed = new URL(url);
       const code = parsed.searchParams.get('code');
