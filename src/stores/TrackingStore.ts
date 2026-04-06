@@ -17,18 +17,14 @@ class TrackingStore {
   public startedAt: Date | null = null;
   public elapsedSeconds: number = 0;
 
-  public displayName: string | null = null;
   public isFinished: boolean = false;
   public checkpoints: Checkpoint[] = [];
   public visitedCheckpointIds: Set<string> = new Set();
   public nearCheckpointId: string | null = null;
   private timerId: ReturnType<typeof setInterval> | null = null;
-  private _lastBroadcastLat: number | null = null;
-  private _lastBroadcastLng: number | null = null;
-  private _positionSaveTimerId: ReturnType<typeof setInterval> | null = null;
   private _userId: string | null = null;
-  private _channel: ReturnType<typeof supabase.channel> | null = null;
   private _sessionId: string | null = null;
+  private _onCheckpointVisited: (() => void) | null = null;
   private groupId: string;
   private routePoints: { lat: number; lng: number }[];
 
@@ -233,106 +229,16 @@ class TrackingStore {
 
   public dispose(): void {
     this._clearTimer();
-    if (this._positionSaveTimerId !== null) {
-      clearInterval(this._positionSaveTimerId);
-      this._positionSaveTimerId = null;
-    }
-    if (this._userId && this.latestLat !== null && this.latestLng !== null) {
-      void supabase.from('group_member_positions').upsert({
-        user_id: this._userId,
-        group_id: this.groupId,
-        lat: this.latestLat,
-        lng: this.latestLng,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id,group_id' });
-    }
-    if (this._channel) {
-      void supabase.removeChannel(this._channel);
-      runInAction(() => { this._channel = null; });
-    }
   }
 
   public setLatestPosition(lat: number, lng: number): void {
     this.latestLat = lat;
     this.latestLng = lng;
     this._updateNearCheckpoint(lat, lng);
-    this._maybeBroadcast(lat, lng);
   }
 
-  public async startLocationBroadcast(): Promise<void> {
-    if (this._channel) return;
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('display_name')
-        .eq('id', user.id)
-        .single();
-
-      const channel = supabase.channel(`group-progress:${this.groupId}`);
-      channel.subscribe();
-
-      runInAction(() => {
-        this._userId = user.id;
-        this.displayName = profile?.display_name ?? user.email?.split('@')[0] ?? null;
-        this._channel = channel;
-      });
-    } catch {
-      // silent
-      return;
-    }
-
-    // 진입 즉시 위치 저장
-    if (this._userId && this.latestLat !== null && this.latestLng !== null) {
-      void supabase.from('group_member_positions').upsert({
-        user_id: this._userId,
-        group_id: this.groupId,
-        lat: this.latestLat,
-        lng: this.latestLng,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id,group_id' });
-    }
-
-    runInAction(() => {
-      this._positionSaveTimerId = setInterval(() => {
-        if (this._userId && this.latestLat !== null && this.latestLng !== null) {
-          void supabase.from('group_member_positions').upsert({
-            user_id: this._userId!,
-            group_id: this.groupId,
-            lat: this.latestLat!,
-            lng: this.latestLng!,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: 'user_id,group_id' });
-        }
-      }, 5000);
-    });
-  }
-
-  private _maybeBroadcast(lat: number, lng: number): void {
-    if (!this._channel || !this._userId) return;
-
-    const MIN_DISTANCE_M = 5;
-    if (this._lastBroadcastLat !== null && this._lastBroadcastLng !== null) {
-      const dist = haversineMeters(this._lastBroadcastLat, this._lastBroadcastLng, lat, lng);
-      if (dist < MIN_DISTANCE_M) return;
-    }
-
-    this._lastBroadcastLat = lat;
-    this._lastBroadcastLng = lng;
-
-    void this._channel.send({
-      type: 'broadcast',
-      event: 'progress',
-      payload: {
-        userId: this._userId,
-        displayName: this.displayName,
-        maxRouteMeters: this.maxRouteMeters,
-        lat,
-        lng,
-        checkpointsVisited: this.visitedCheckpointIds.size,
-      },
-    });
+  public setOnCheckpointVisited(cb: (() => void) | null): void {
+    this._onCheckpointVisited = cb;
   }
 
   public addPoint(lat: number, lng: number): void {
@@ -418,21 +324,7 @@ class TrackingStore {
       this.nearCheckpointId = null;
     });
 
-    // 브로드캐스트에 체크포인트 수 포함하여 즉시 전송
-    if (this._channel && this._userId && this.latestLat !== null && this.latestLng !== null) {
-      void this._channel.send({
-        type: 'broadcast',
-        event: 'progress',
-        payload: {
-          userId: this._userId,
-          displayName: this.displayName,
-          maxRouteMeters: this.maxRouteMeters,
-          lat: this.latestLat,
-          lng: this.latestLng,
-          checkpointsVisited: this.visitedCheckpointIds.size,
-        },
-      });
-    }
+    this._onCheckpointVisited?.();
 
     // 종료 체크포인트 통과 시 트래킹 완료
     if (checkpoint?.is_finish) {
