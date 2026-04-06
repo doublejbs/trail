@@ -2,11 +2,23 @@
 <html>
 <head><meta charset="UTF-8"><title>Redirecting...</title></head>
 <body>
+<p>Redirecting to app...</p>
 <script>
   var params = new URLSearchParams(window.location.search);
   var code = params.get('code');
   if (code) {
-    window.location.href = 'com.trail.app://auth/callback?code=' + encodeURIComponent(code);
+    // Android Intent URI 시도
+    var intentUrl = 'intent://auth/callback?code=' + encodeURIComponent(code)
+      + '#Intent;scheme=com.trail.app;package=com.trail.app;end;';
+    // iOS / 일반 커스텀 스킴
+    var customUrl = 'com.trail.app://auth/callback?code=' + encodeURIComponent(code);
+
+    var isAndroid = /android/i.test(navigator.userAgent);
+    if (isAndroid) {
+      window.location.href = intentUrl;
+    } else {
+      window.location.href = customUrl;
+    }
   }
 </script>
 </body>
