@@ -1,4 +1,14 @@
+import { Capacitor } from '@capacitor/core';
+import { StatusBar, Style } from '@capacitor/status-bar';
+import { SplashScreen } from '@capacitor/splash-screen';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+
+if (Capacitor.isNativePlatform()) {
+  StatusBar.setStyle({ style: Style.Light });
+  StatusBar.setBackgroundColor({ color: '#ffffff' });
+  SplashScreen.hide();
+}
+
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
