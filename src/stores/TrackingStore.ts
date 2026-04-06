@@ -1,6 +1,7 @@
 import { makeAutoObservable, runInAction } from 'mobx';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
+import { acquireWakeLock, releaseWakeLock } from '../lib/wakeLock';
 import { haversineMeters, maxRouteProgress, totalRouteDistance } from '../utils/routeProjection';
 import type { Checkpoint } from '../types/checkpoint';
 
@@ -86,6 +87,7 @@ class TrackingStore {
       });
 
       this._startTimer();
+      acquireWakeLock();
 
       // 체크포인트 통과 상태 복원
       const { data: visits } = await supabase
@@ -147,10 +149,12 @@ class TrackingStore {
     });
 
     this._startTimer();
+    acquireWakeLock();
   }
 
   public async stop(): Promise<void> {
     this._clearTimer();
+    releaseWakeLock();
     if (!this._sessionId) {
       runInAction(() => { this.isTracking = false; });
       return;
@@ -191,6 +195,7 @@ class TrackingStore {
 
   public async restart(): Promise<void> {
     this._clearTimer();
+    releaseWakeLock();
 
     // sessionId가 있으면 해당 세션 종료
     if (this._sessionId) {
@@ -229,6 +234,7 @@ class TrackingStore {
 
   public dispose(): void {
     this._clearTimer();
+    releaseWakeLock();
   }
 
   public setLatestPosition(lat: number, lng: number): void {
