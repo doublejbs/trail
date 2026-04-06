@@ -72,6 +72,27 @@ export const GroupCreatePage = observer(() => {
 
 **access control 리다이렉트** (권한 없음, 데이터 없음 등)는 컴포넌트 JSX에 `<Navigate>` 컴포넌트로 표현한다 — 스토어 상태를 읽어 조건부로 렌더링.
 
+### 스토어 분류
+
+| 분류 | 접미사 | 위치 | 역할 |
+|------|--------|------|------|
+| 비즈니스 스토어 | `~Store` | `src/stores/` | 데이터 fetch, 비즈니스 로직, Supabase 통신 |
+| UI 스토어 | `~UIStore` | `src/stores/ui/` | 페이지 전용 UI 상태 (탭, 모달, 초기화 오케스트레이션) |
+
+**UI 스토어 패턴:** 페이지의 `useState`/`useEffect` 오케스트레이션을 UI 스토어로 이동한다. 페이지 컴포넌트는 JSX 렌더링만 담당.
+
+```typescript
+// UI 스토어 — src/stores/ui/GroupMapUIStore.ts
+class GroupMapUIStore {
+  activeTab: 'map' | 'leaderboard' = 'map';
+  showElevation = false;
+  // ...
+  constructor(groupId: string, navigate: NavigateFunction) {
+    makeAutoObservable(this);
+  }
+}
+```
+
 ### 라우팅
 
 라우트는 `src/App.tsx`에 정의된다. 인증이 필요한 라우트는 `<ProtectedRoute>`로 감싸져 있으며, `AuthStore`로 세션을 확인해 미인증 시 `/login?next=...`으로 리다이렉트한다.
@@ -118,9 +139,11 @@ gpx-files/           # 그룹 직접 업로드 GPX + 썸네일
 
 ### 트래킹 시스템
 
-**TrackingStore:** 상태 변경(start/pause/resume/stop)마다 즉시 DB UPDATE. 페이지 로드 시 `restore()`로 active/paused 세션 복원.
+**TrackingStore:** 세션 관리(start/pause/resume/stop) + 위치 추적 + 체크포인트 판정. 페이지 로드 시 `restore()`로 active 세션 복원. `setOnCheckpointVisited()` 콜백으로 외부에 체크포인트 방문 알림.
 
-**실시간 순위:** Supabase Realtime broadcast 채널(`group-progress:{groupId}`)로 1초마다 진행률 전송. `LeaderboardStore`가 구독하여 실시간 순위 갱신.
+**TrackingBroadcastStore:** Supabase Realtime broadcast 채널(`group-progress:{groupId}`)로 진행률 전송. `TrackingStore`를 참조로 받아 상태를 읽되, `TrackingStore`는 broadcast 존재를 모름 (단방향 의존).
+
+**실시간 순위:** `LeaderboardStore`가 broadcast 채널을 구독하여 실시간 순위 갱신.
 
 ### GPX 유틸리티
 
@@ -134,6 +157,15 @@ gpx-files/           # 그룹 직접 업로드 GPX + 썸네일
 - 모든 스타일링은 Tailwind 유틸리티 클래스 사용; CSS 모듈 없음
 - 토스트 알림은 `sonner` 사용
 - 디자인 톤: 블랙/화이트 미니멀, opacity 기반 계층 (`black/[0.06]` ~ `black/70`)
+
+### 컴포넌트 선언 규칙
+
+- 리액트 컴포넌트/훅은 **화살표 함수**로 선언한다:
+  ```tsx
+  export const GroupCard = ({ group }: Props) => { ... };
+  export const LoginPage = observer(() => { ... });
+  ```
+- `function` 키워드 선언은 사용하지 않는다 (shadcn/ui 기본 컴포넌트 제외).
 
 ### 테스트
 
@@ -161,18 +193,38 @@ gpx-files/           # 그룹 직접 업로드 GPX + 썸네일
 | CourseStore | 코스 목록 | |
 | CourseDetailStore | 코스 상세 | |
 | CourseUploadStore | 코스 업로드 | |
-| MapStore | 네이버 지도 래퍼 | |
-| TrackingStore | 실시간 위치 트래킹 | |
+| MapStore | 네이버 지도 코어 (초기화, 위치 추적) | |
+| MapRenderingStore | GPX 경로/마커/체크포인트 렌더링 | |
+| MemberMarkerStore | 멤버 실시간 위치 마커 | |
+| TrackingStore | 위치 트래킹/세션 관리 | |
+| TrackingBroadcastStore | Realtime 채널 broadcast | |
 | LeaderboardStore | 실시간 순위 | |
 | HistoryStore | 활동 기록 | |
 | ProfileStore | 프로필 편집 | |
 
-### MapStore 핵심 설정 (`src/stores/MapStore.ts`)
+### UI 스토어 목록 (`src/stores/ui/`)
 
+| 파일 | 역할 |
+|------|------|
+| GroupMapUIStore | GroupMapPage UI 상태 + 스토어 오케스트레이션 |
+| CourseDetailUIStore | CourseDetailPage UI 상태 (시트, GPX 텍스트) |
+
+### 지도 스토어 구조
+
+**MapStore** (`src/stores/MapStore.ts`) — 지도 코어:
+- `initMap(el, center?)` — 네이버 지도 인스턴스 생성
+- `startWatchingLocation(onLocationUpdate?)` — 내 위치 추적
+- `locate()`, `setLocationAvatarUrl()`, `destroy()`
+
+**MapRenderingStore** (`src/stores/MapRenderingStore.ts`) — 경로/마커 렌더링:
+- 생성자에 `getMap: () => naver.maps.Map | null` 주입
 - `GAP_THRESHOLD = 150` (m) — 연속 포인트 간격이 150m 초과 시 별도 폴리라인 세그먼트로 분리
-- `drawGpxRoute(gpxText)` — `trkpt` 요소 파싱, 세그먼트 분리, 시작(녹색)/종료(빨간) 핀 마커 생성
-- `returnToCourse()` — `fitBounds`로 코스 전체 보기
-- `startWatchingLocation()` — 내 위치 파란 점 마커 추적
+- `drawGpxRoute(gpxText)` — boolean 반환 (성공/실패)
+- `drawCheckpoints()`, `returnToCourse()`, `clearGpxRoute()`, `destroy()`
+
+**MemberMarkerStore** (`src/stores/MemberMarkerStore.ts`) — 멤버 마커:
+- 생성자에 `getMap` 주입 (동일 패턴)
+- `updateMemberMarker()`, `clearAll()`
 
 ### 타입 정의 (`src/types/`)
 
