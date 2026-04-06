@@ -124,16 +124,12 @@ export const GroupSettingsPage = observer(() => {
               ))}
             </div>
           )}
-          {!store.isPeriodActive ? (
-            <button
-              onClick={() => navigate(`/group/${id}/checkpoints`)}
-              className="w-full py-2.5 rounded-xl bg-black text-white text-[13px] font-semibold active:bg-black/80 transition-colors"
-            >
-              체크포인트 편집
-            </button>
-          ) : (
-            <p className="text-[11px] text-black/30">활동 중에는 체크포인트를 수정할 수 없습니다</p>
-          )}
+          <button
+            onClick={() => navigate(`/group/${id}/checkpoints`)}
+            className="w-full py-2.5 rounded-xl bg-black text-white text-[13px] font-semibold active:bg-black/80 transition-colors"
+          >
+            체크포인트 편집
+          </button>
         </section>
 
         {/* Invite Link Section */}

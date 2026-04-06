@@ -507,7 +507,7 @@ export const GroupMapPage = observer(() => {
     {trackingStore.isFinished && (
       <FinishCelebration
         elapsedTime={trackingStore.formattedTime}
-        distanceKm={`${(trackingStore.distanceMeters / 1000).toFixed(1)}km`}
+        distanceKm={`${(trackingStore.maxRouteMeters / 1000).toFixed(1)}km`}
         onClose={() => runInAction(() => { trackingStore.isFinished = false; })}
       />
     )}

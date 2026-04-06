@@ -232,11 +232,6 @@ export const CheckpointEditPage = observer(() => {
     return <Navigate to="/group" replace />;
   }
 
-  // 활동 중이면 편집 불가 → 설정 페이지로 이동
-  if (store.isPeriodActive) {
-    return <Navigate to={`/group/${id}/settings`} replace />;
-  }
-
   return (
     <div className="absolute inset-0 flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <NavigationBar

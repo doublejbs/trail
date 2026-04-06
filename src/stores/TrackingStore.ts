@@ -181,7 +181,6 @@ class TrackingStore {
         this.isTracking = false;
         this._sessionId = null;
         this.startedAt = null;
-        this.elapsedSeconds = 0;
       });
       toast.success('기록이 저장되었습니다');
     } catch (e) {
@@ -284,6 +283,17 @@ class TrackingStore {
       return;
     }
 
+    // 진입 즉시 위치 저장
+    if (this._userId && this.latestLat !== null && this.latestLng !== null) {
+      void supabase.from('group_member_positions').upsert({
+        user_id: this._userId,
+        group_id: this.groupId,
+        lat: this.latestLat,
+        lng: this.latestLng,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id,group_id' });
+    }
+
     runInAction(() => {
       this._positionSaveTimerId = setInterval(() => {
         if (this._userId && this.latestLat !== null && this.latestLng !== null) {
@@ -380,10 +390,17 @@ class TrackingStore {
     // 탭 시점에 실제 거리로 재확인
     const cp = this.checkpoints.find((c) => c.id === checkpointId);
     if (!cp || this.latestLat === null || this.latestLng === null) return;
-    const dist = haversineMeters(this.latestLat, this.latestLng, cp.lat, cp.lng);
-    if (dist > cp.radius_m) {
-      toast(`체크포인트 반경 안에 들어와야 인증할 수 있습니다 (${Math.round(dist)}m/${cp.radius_m}m)`);
-      return;
+
+    // 경로상에서 체크포인트를 이미 지나쳤는지 확인
+    const cpRouteMeters = maxRouteProgress([{ lat: cp.lat, lng: cp.lng }], this.routePoints);
+    const alreadyPassed = this.routePoints.length >= 2 && cpRouteMeters > 0 && this.maxRouteMeters >= cpRouteMeters;
+
+    if (!alreadyPassed) {
+      const dist = haversineMeters(this.latestLat, this.latestLng, cp.lat, cp.lng);
+      if (dist > cp.radius_m) {
+        toast(`체크포인트 반경 안에 들어와야 인증할 수 있습니다 (${Math.round(dist)}m/${cp.radius_m}m)`);
+        return;
+      }
     }
 
     const { error } = await supabase.from('checkpoint_visits').insert({
