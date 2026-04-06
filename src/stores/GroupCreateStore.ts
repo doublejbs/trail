@@ -69,6 +69,69 @@ class GroupCreateStore {
     return this.file !== null;
   }
 
+  public async createFromCourse(course: Course, groupName: string): Promise<string | null> {
+    runInAction(() => {
+      this.submitting = true;
+      this.error = null;
+    });
+
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) {
+      runInAction(() => { this.submitting = false; });
+      toast.error('로그인이 필요합니다');
+      return null;
+    }
+
+    const groupId = crypto.randomUUID();
+    const { error } = await supabase.from('groups').insert({
+      id: groupId,
+      name: groupName.trim(),
+      created_by: userId,
+      gpx_path: course.gpx_path,
+      gpx_bucket: 'course-gpx',
+      thumbnail_path: course.thumbnail_path ?? null,
+    });
+
+    if (error) {
+      runInAction(() => { this.submitting = false; });
+      toast.error('그룹 생성에 실패했습니다');
+      return null;
+    }
+
+    // 종료 체크포인트 자동 생성
+    try {
+      const { data: urlData } = await supabase.storage
+        .from('course-gpx')
+        .createSignedUrl(course.gpx_path, 60);
+      if (urlData?.signedUrl) {
+        const resp = await fetch(urlData.signedUrl);
+        if (resp.ok) {
+          const gpxText = await resp.text();
+          const coords = parseGpxCoords(gpxText);
+          if (coords && coords.length >= 2) {
+            const lastCoord = coords[coords.length - 1];
+            const totalDist = computeDistanceM(coords);
+            await supabase.from('checkpoints').insert({
+              group_id: groupId,
+              name: '종료',
+              lat: lastCoord.lat,
+              lng: lastCoord.lon,
+              radius_m: 30,
+              sort_order: totalDist,
+              is_finish: true,
+            });
+          }
+        }
+      }
+    } catch {
+      // 체크포인트 생성 실패해도 그룹 생성은 성공으로 처리
+    }
+
+    runInAction(() => { this.submitting = false; });
+    return groupId;
+  }
+
   public async submit(): Promise<void> {
     runInAction(() => {
       this.submitting = true;
