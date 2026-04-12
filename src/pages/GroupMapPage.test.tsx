@@ -45,7 +45,6 @@ const mockMapStore = mockObs({
   destroy: vi.fn(),
   locate: vi.fn(),
   startWatchingLocation: vi.fn(),
-  setLocationAvatarUrl: vi.fn(),
 }, ['map', 'error']);
 
 const mockRenderingStore = mockObs({

@@ -35,11 +35,11 @@ export const CourseMapView = ({ courses, onClose }: Props) => {
       })
     : [];
 
-  // 바텀시트 높이 측정
 // 지도 초기화
   useEffect(() => {
     if (!mapRef.current) return;
     mapStore.initMap(mapRef.current);
+    mapStore.startWatchingLocation();
     return () => { renderingStore.destroy(); mapStore.destroy(); };
   }, [mapStore, renderingStore]);
 

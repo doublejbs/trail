@@ -45,7 +45,7 @@ class CourseStore {
       const uid = userData?.user?.id ?? '';
       let q = supabase
         .from('courses')
-        .select('*')
+        .select('*, course_likes(count)')
         .eq('created_by', uid)
         .order('created_at', { ascending: false })
         .range(from, to);
@@ -54,7 +54,7 @@ class CourseStore {
     } else {
       let q = supabase
         .from('courses')
-        .select('*')
+        .select('*, course_likes(count)')
         .eq('is_public', true)
         .order('created_at', { ascending: false })
         .range(from, to);
@@ -66,7 +66,11 @@ class CourseStore {
       if (result.error) {
         this.error = result.error.message;
       } else if (result.data) {
-        this.courses = [...this.courses, ...result.data];
+        const mapped = (result.data as unknown as Record<string, unknown>[]).map((row) => {
+          const likes = row.course_likes as { count: number }[] | undefined;
+          return { ...row, like_count: likes?.[0]?.count ?? 0 } as Course;
+        });
+        this.courses = [...this.courses, ...mapped];
         this.page += 1;
       }
       this.loading = false;

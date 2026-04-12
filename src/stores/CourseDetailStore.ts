@@ -59,7 +59,7 @@ class CourseDetailStore {
       ] = await Promise.all([
         supabase.from('course_likes').select('*', { count: 'exact', head: true }).eq('course_id', this.courseId),
         uid
-          ? supabase.from('course_likes').select('user_id').eq('course_id', this.courseId).eq('user_id', uid).single()
+          ? supabase.from('course_likes').select('user_id').eq('course_id', this.courseId).eq('user_id', uid).maybeSingle()
           : Promise.resolve({ data: null }),
         supabase.from('course_comments').select('*').eq('course_id', this.courseId).order('created_at', { ascending: false }),
       ]);

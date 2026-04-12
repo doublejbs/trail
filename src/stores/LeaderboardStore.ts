@@ -33,14 +33,21 @@ class LeaderboardStore {
     runInAction(() => { this.loading = true; this.error = null; });
 
     try {
-      let query = supabase
+      // 1단계: sessions + positions 병렬 조회
+      let sessionsQuery = supabase
         .from('tracking_sessions')
         .select('id, user_id, max_route_meters, created_at')
         .eq('group_id', this.groupId);
       if (periodStartedAt) {
-        query = query.gte('created_at', periodStartedAt.toISOString());
+        sessionsQuery = sessionsQuery.gte('created_at', periodStartedAt.toISOString());
       }
-      const { data: sessions, error: sessionsError } = await query;
+      const [{ data: sessions, error: sessionsError }, { data: positions }] = await Promise.all([
+        sessionsQuery,
+        supabase
+          .from('group_member_positions')
+          .select('user_id, lat, lng')
+          .eq('group_id', this.groupId),
+      ]);
       if (sessionsError) throw sessionsError;
 
       // 유저별 최신 세션 ID (체크포인트 집계용)
@@ -59,86 +66,69 @@ class LeaderboardStore {
         maxByUser.set(row.user_id, Math.max(prev, row.max_route_meters ?? 0));
       }
 
-      const userIds = [...maxByUser.keys()];
-      const nameMap = new Map<string, string>();
-      const avatarUrlMap = new Map<string, string | null>();
-      if (userIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, display_name, avatar_path')
-          .in('id', userIds);
-        await Promise.all((profiles ?? []).map(async (p) => {
-          nameMap.set(p.id, p.display_name);
-          if (p.avatar_path) {
-            const { data: signed } = await supabase.storage
-              .from('avatars')
-              .createSignedUrl(p.avatar_path, 3600);
-            avatarUrlMap.set(p.id, signed?.signedUrl ?? null);
-          } else {
-            avatarUrlMap.set(p.id, null);
-          }
-        }));
-      }
-
-      // 체크포인트 통과 수 집계: 현재 기간 세션 + 현재 존재하는 체크포인트만
-      const checkpointCountMap = new Map<string, number>();
-      if (latestSessionIds.length > 0) {
-        const [{ data: visits }, { data: currentCheckpoints }] = await Promise.all([
-          supabase
-            .from('checkpoint_visits')
-            .select('user_id, checkpoint_id')
-            .in('tracking_session_id', latestSessionIds),
-          supabase
-            .from('checkpoints')
-            .select('id')
-            .eq('group_id', this.groupId),
-        ]);
-        const validCpIds = new Set((currentCheckpoints ?? []).map((cp) => cp.id));
-        if (visits) {
-          const byUser = new Map<string, Set<string>>();
-          for (const v of visits) {
-            if (!validCpIds.has(v.checkpoint_id)) continue;
-            if (!byUser.has(v.user_id)) byUser.set(v.user_id, new Set());
-            byUser.get(v.user_id)!.add(v.checkpoint_id);
-          }
-          for (const [uid, cpIds] of byUser) {
-            checkpointCountMap.set(uid, cpIds.size);
-          }
-        }
-      }
-
-      // group_member_positions에서 그룹 전체 위치 조회 (tracking session 없는 멤버 포함)
       const positionMap = new Map<string, { lat: number; lng: number }>();
-      const { data: positions } = await supabase
-        .from('group_member_positions')
-        .select('user_id, lat, lng')
-        .eq('group_id', this.groupId);
       for (const p of positions ?? []) {
         positionMap.set(p.user_id, { lat: p.lat, lng: p.lng });
       }
 
-      // tracking session 없지만 위치가 있는 멤버 프로필 추가 조회
-      const positionOnlyIds = [...positionMap.keys()].filter((id) => !maxByUser.has(id));
-      if (positionOnlyIds.length > 0) {
-        const { data: extraProfiles } = await supabase
-          .from('profiles')
-          .select('id, display_name, avatar_path')
-          .in('id', positionOnlyIds);
-        await Promise.all((extraProfiles ?? []).map(async (p) => {
-          nameMap.set(p.id, p.display_name);
-          if (p.avatar_path) {
-            const { data: signed } = await supabase.storage
-              .from('avatars')
-              .createSignedUrl(p.avatar_path, 3600);
-            avatarUrlMap.set(p.id, signed?.signedUrl ?? null);
-          } else {
-            avatarUrlMap.set(p.id, null);
-          }
-        }));
+      // 전체 유저 집합: tracking session + position-only → 프로필 1회 조회
+      const allUserIds = new Set([...maxByUser.keys(), ...positionMap.keys()]);
+      const nameMap = new Map<string, string>();
+      const avatarUrlMap = new Map<string, string | null>();
+
+      // 2단계: 프로필 + 체크포인트 병렬 조회 (프로필은 한 번만)
+      const profilesPromise = allUserIds.size > 0
+        ? supabase.from('profiles').select('id, display_name, avatar_path').in('id', [...allUserIds])
+        : Promise.resolve({ data: null });
+
+      const checkpointPromise = latestSessionIds.length > 0
+        ? Promise.all([
+            supabase.from('checkpoint_visits').select('user_id, checkpoint_id').in('tracking_session_id', latestSessionIds),
+            supabase.from('checkpoints').select('id').eq('group_id', this.groupId),
+          ])
+        : Promise.resolve([{ data: null }, { data: null }] as const);
+
+      const [{ data: profiles }, checkpointResults] = await Promise.all([profilesPromise, checkpointPromise]);
+
+      // 아바타 signed URL 일괄 생성 (N+1 → 배치 1회)
+      const avatarPaths: string[] = [];
+      const userIdByPath = new Map<string, string>();
+      for (const p of profiles ?? []) {
+        nameMap.set(p.id, p.display_name);
+        if (p.avatar_path) {
+          avatarPaths.push(p.avatar_path);
+          userIdByPath.set(p.avatar_path, p.id);
+        } else {
+          avatarUrlMap.set(p.id, null);
+        }
+      }
+      if (avatarPaths.length > 0) {
+        const { data: urls } = await supabase.storage.from('avatars').createSignedUrls(avatarPaths, 3600);
+        for (const u of urls ?? []) {
+          const uid = u.path ? userIdByPath.get(u.path) : null;
+          if (uid && !u.error && u.signedUrl) avatarUrlMap.set(uid, u.signedUrl);
+        }
+      }
+      // avatarUrlMap에 없는 유저는 null 처리
+      for (const uid of allUserIds) {
+        if (!avatarUrlMap.has(uid)) avatarUrlMap.set(uid, null);
       }
 
-      // 전체 유저 집합: tracking session + position-only
-      const allUserIds = new Set([...maxByUser.keys(), ...positionMap.keys()]);
+      // 체크포인트 통과 수 집계
+      const checkpointCountMap = new Map<string, number>();
+      const [{ data: visits }, { data: currentCheckpoints }] = checkpointResults;
+      if (visits && currentCheckpoints) {
+        const validCpIds = new Set(currentCheckpoints.map((cp) => cp.id));
+        const byUser = new Map<string, Set<string>>();
+        for (const v of visits) {
+          if (!validCpIds.has(v.checkpoint_id)) continue;
+          if (!byUser.has(v.user_id)) byUser.set(v.user_id, new Set());
+          byUser.get(v.user_id)!.add(v.checkpoint_id);
+        }
+        for (const [uid, cpIds] of byUser) {
+          checkpointCountMap.set(uid, cpIds.size);
+        }
+      }
 
       runInAction(() => {
         this.rankings = [...allUserIds]

@@ -41,8 +41,8 @@ vi.mock('../lib/supabase', () => ({
             if (opts?.count === 'exact') {
               return { eq: () => mockLikeCount() };
             }
-            // userHasLiked query: select('user_id').eq().eq().single()
-            return { eq: () => ({ eq: () => ({ single: () => mockMyLikeSingle() }) }) };
+            // userHasLiked query: select('user_id').eq().eq().maybeSingle()
+            return { eq: () => ({ eq: () => ({ maybeSingle: () => mockMyLikeSingle() }) }) };
           },
           insert: (...a: unknown[]) => mockInsert(...a),
           delete: () => ({ eq: () => ({ eq: () => mockDelete() }) }),

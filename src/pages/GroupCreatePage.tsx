@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { observer } from 'mobx-react-lite';
-import { MapPin, TrendingUp, Check } from 'lucide-react';
+import { MapPin, TrendingUp, Check, Search } from 'lucide-react';
 import { NavigationBar } from '../components/NavigationBar';
 import { GroupCreateStore } from '../stores/GroupCreateStore';
 import { MapStore } from '../stores/MapStore';
@@ -92,14 +92,26 @@ const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
       <div className="flex-1 overflow-y-auto px-5 pb-3">
         {store.sourceMode === 'course' ? (
           <div className="flex flex-col gap-2.5">
+            <div className="flex items-center gap-2 bg-black/[0.04] rounded-xl px-3 py-2.5">
+              <Search size={15} className="text-black/30 shrink-0" />
+              <input
+                type="text"
+                value={store.courseQuery}
+                onChange={(e) => store.setCourseQuery(e.target.value)}
+                placeholder="코스 검색"
+                className="flex-1 bg-transparent text-[14px] outline-none placeholder:text-black/30"
+              />
+            </div>
             {store.coursesLoading ? (
               <div className="flex justify-center py-8">
                 <div className="w-5 h-5 border-2 border-black/15 border-t-black rounded-full animate-spin" />
               </div>
-            ) : store.courses.length === 0 ? (
-              <p className="text-[13px] text-black/30 text-center py-8">등록된 코스가 없습니다</p>
+            ) : store.filteredCourses.length === 0 ? (
+              <p className="text-[13px] text-black/30 text-center py-8">
+                {store.courseQuery.trim() ? '검색 결과가 없습니다' : '등록된 코스가 없습니다'}
+              </p>
             ) : (
-              store.courses.map((course) => {
+              store.filteredCourses.map((course) => {
                 const selected = store.selectedCourseId === course.id;
                 return (
                   <button

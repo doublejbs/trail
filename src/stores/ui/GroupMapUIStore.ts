@@ -103,13 +103,13 @@ class GroupMapUIStore {
   }
 
   // Init methods
-  public async loadAvatarUrl(): Promise<void> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+  public async loadAvatarUrl(userId?: string | null): Promise<void> {
+    const uid = userId ?? (await supabase.auth.getUser()).data?.user?.id;
+    if (!uid) return;
     const { data: profile } = await supabase
       .from('profiles')
       .select('avatar_path')
-      .eq('id', user.id)
+      .eq('id', uid)
       .single();
     if (!profile?.avatar_path) return;
     const { data: signed } = await supabase.storage
@@ -124,7 +124,7 @@ class GroupMapUIStore {
       this.trackingStore.setLatestPosition(lat, lng);
       this.trackingStore.addPoint(lat, lng);
       this.broadcastStore.broadcast(lat, lng);
-    });
+    }, 'avatar');
     void this.broadcastStore.start();
     this.renderingStore.setOnCheckpointTap((cpId) => {
       void this.trackingStore.visitCheckpoint(cpId);
@@ -174,21 +174,21 @@ class GroupMapUIStore {
     const admin = this.groupMapStore.currentUserId === this.groupMapStore.group?.created_by;
     const unsubscribe = this.groupMapStore.subscribeToPeriodEvents(admin);
 
-    const disposerEnd = reaction(
-      () => this.groupMapStore.periodEndedAt,
-      (endedAt) => {
-        void this.leaderboardStore.load(this.groupMapStore.periodStartedAt);
+    // period 변경 시 leaderboard 1회만 리로드 (두 reaction → 하나로 통합)
+    const disposerPeriod = reaction(
+      () => ({
+        startedAt: this.groupMapStore.periodStartedAt,
+        endedAt: this.groupMapStore.periodEndedAt,
+      }),
+      ({ startedAt, endedAt }) => {
+        void this.leaderboardStore.load(startedAt);
         if (endedAt && this.trackingStore.isTracking) {
           void this.trackingStore.stop();
         }
       },
     );
-    const disposerStart = reaction(
-      () => this.groupMapStore.periodStartedAt,
-      (startedAt) => { void this.leaderboardStore.load(startedAt); },
-    );
 
-    this._periodDisposers = [unsubscribe, disposerEnd, disposerStart];
+    this._periodDisposers = [unsubscribe, disposerPeriod];
   }
 
   public dispose(): void {

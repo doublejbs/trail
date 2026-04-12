@@ -8,8 +8,9 @@ class MapStore {
 
   private watchId: string | null = null;
   private lastPosition: { latitude: number; longitude: number } | null = null;
-  private locationAvatarUrl: string | null = null;
   private _logoEl: HTMLDivElement | null = null;
+  private _markerStyle: 'blue' | 'avatar' = 'blue';
+  private _avatarUrl: string | null = null;
 
   public constructor() {
     makeAutoObservable(this, {
@@ -92,18 +93,24 @@ class MapStore {
     this.map = null;
   }
 
+  private static LOCATE_MIN_ZOOM = 15;
+
   public locate(): void {
     if (!this.map) return;
     if (this.lastPosition) {
-      const { latitude, longitude } = this.lastPosition;
-      this.map.setCenter(new window.naver.maps.LatLng(latitude, longitude));
+      this._moveToPosition(this.lastPosition.latitude, this.lastPosition.longitude);
     } else {
       getCurrentPosition()
-        .then((pos) => {
-          this.map?.setCenter(new window.naver.maps.LatLng(pos.latitude, pos.longitude));
-        })
+        .then((pos) => { this._moveToPosition(pos.latitude, pos.longitude); })
         .catch((err) => { console.error('[locate] error', err); });
     }
+  }
+
+  private _moveToPosition(lat: number, lng: number): void {
+    if (!this.map) return;
+    const latlng = new window.naver.maps.LatLng(lat, lng);
+    const targetZoom = Math.max(this.map.getZoom(), MapStore.LOCATE_MIN_ZOOM);
+    this.map.morph(latlng, targetZoom);
   }
 
   public stopWatchingLocation(): void {
@@ -115,30 +122,44 @@ class MapStore {
     this.locationMarker = null;
   }
 
-  private _buildLocationMarkerContent(): string {
-    const avatarUrl = this.locationAvatarUrl;
-    const inner = avatarUrl
-      ? `<img src="${avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`
-      : `<div style="width:100%;height:100%;border-radius:50%;background:#222;"></div>`;
+  private static MARKER_SIZE = 40;
 
+  private _buildLocationMarkerContent(): string {
+    if (this._markerStyle === 'avatar') return this._buildAvatarMarker();
+    return this._buildBlueMarker();
+  }
+
+  private _buildBlueMarker(): string {
+    const s = MapStore.MARKER_SIZE;
     return `
       <style>
         @keyframes loc-pulse {
-          0%   { transform: scale(1);   opacity: 0.5; }
-          70%  { transform: scale(2.2); opacity: 0; }
-          100% { transform: scale(2.2); opacity: 0; }
-        }
-        @keyframes loc-pulse2 {
-          0%   { transform: scale(1);   opacity: 0.3; }
-          70%  { transform: scale(1.7); opacity: 0; }
-          100% { transform: scale(1.7); opacity: 0; }
+          0%   { transform: scale(0.8); opacity: 0.6; }
+          100% { transform: scale(2.4); opacity: 0; }
         }
       </style>
-      <div style="position:relative;width:60px;height:76px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;">
-        <div style="position:relative;width:60px;height:60px;display:flex;align-items:center;justify-content:center;">
-          <div style="position:absolute;width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,0.15);animation:loc-pulse 2s ease-out infinite;z-index:0;"></div>
-          <div style="position:absolute;width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,0.1);animation:loc-pulse2 2s ease-out 0.4s infinite;z-index:0;"></div>
-          <div style="position:relative;width:36px;height:36px;border-radius:50%;overflow:hidden;border:2.5px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.25);flex-shrink:0;z-index:1;background:white;">
+      <div style="position:relative;width:${s}px;height:${s}px;display:flex;align-items:center;justify-content:center;">
+        <div style="position:absolute;width:${s}px;height:${s}px;border-radius:50%;background:rgba(66,133,244,0.25);animation:loc-pulse 1.8s ease-out infinite;"></div>
+        <div style="width:16px;height:16px;border-radius:50%;background:#4285F4;border:2.5px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);position:relative;z-index:1;"></div>
+      </div>`;
+  }
+
+  private _buildAvatarMarker(): string {
+    const s = MapStore.MARKER_SIZE;
+    const inner = this._avatarUrl
+      ? `<img src="${this._avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`
+      : `<div style="width:100%;height:100%;border-radius:50%;background:#222;"></div>`;
+    return `
+      <style>
+        @keyframes loc-pulse {
+          0%   { transform: scale(0.8); opacity: 0.6; }
+          100% { transform: scale(2.4); opacity: 0; }
+        }
+      </style>
+      <div style="position:relative;width:${s}px;height:${s + 18}px;display:flex;flex-direction:column;align-items:center;">
+        <div style="position:relative;width:${s}px;height:${s}px;display:flex;align-items:center;justify-content:center;">
+          <div style="position:absolute;width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,0.12);animation:loc-pulse 2s ease-out infinite;"></div>
+          <div style="position:relative;width:32px;height:32px;border-radius:50%;overflow:hidden;border:2.5px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.25);z-index:1;background:white;">
             ${inner}
           </div>
         </div>
@@ -147,14 +168,16 @@ class MapStore {
   }
 
   public setLocationAvatarUrl(url: string | null): void {
-    this.locationAvatarUrl = url;
+    this._avatarUrl = url;
     if (this.locationMarker) {
-      this.locationMarker.setIcon({ content: this._buildLocationMarkerContent(), anchor: new window.naver.maps.Point(30, 30) });
+      const half = MapStore.MARKER_SIZE / 2;
+      this.locationMarker.setIcon({ content: this._buildLocationMarkerContent(), anchor: new window.naver.maps.Point(half, half) });
     }
   }
 
-  public startWatchingLocation(onLocationUpdate?: (lat: number, lng: number) => void): void {
+  public startWatchingLocation(onLocationUpdate?: (lat: number, lng: number) => void, markerStyle: 'blue' | 'avatar' = 'blue'): void {
     if (!this.map) return;
+    this._markerStyle = markerStyle;
 
     watchPosition(
       (pos) => {
@@ -164,6 +187,7 @@ class MapStore {
 
         runInAction(() => {
           if (!this.locationMarker) {
+            const half = MapStore.MARKER_SIZE / 2;
             this.locationMarker = new window.naver.maps.Marker({
               map: this.map!,
               position: latLng,
@@ -171,7 +195,7 @@ class MapStore {
               zIndex: 50,
               icon: {
                 content: this._buildLocationMarkerContent(),
-                anchor: new window.naver.maps.Point(30, 30),
+                anchor: new window.naver.maps.Point(half, half),
               },
             });
           } else {

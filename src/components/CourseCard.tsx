@@ -26,11 +26,16 @@ interface Props {
 
 export const CourseCard = ({ course, likeCount, onClick }: Props) => {
   const cardRef = useRef<HTMLDivElement>(null);
-  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [svgPoints, setSvgPoints] = useState<string | null>(null);
   const [thumbError, setThumbError] = useState(false);
 
+  const thumbnailUrl = course.thumbnail_path
+    ? supabase.storage.from('course-gpx').getPublicUrl(course.thumbnail_path).data.publicUrl
+    : null;
+
+  // 썸네일 없을 때 GPX SVG 폴백
   useEffect(() => {
+    if (thumbnailUrl) return;
     const el = cardRef.current;
     if (!el) return;
 
@@ -38,20 +43,6 @@ export const CourseCard = ({ course, likeCount, onClick }: Props) => {
       async ([entry], observerInstance) => {
         if (!entry?.isIntersecting) return;
         observerInstance.disconnect();
-
-        if (course.thumbnail_path) {
-          try {
-            const { data, error } = await supabase.storage
-              .from('course-gpx')
-              .createSignedUrl(course.thumbnail_path, 3600);
-            if (!error && data?.signedUrl) {
-              setThumbnailUrl(data.signedUrl);
-              return;
-            }
-          } catch {
-            // Fall through to SVG fallback
-          }
-        }
 
         try {
           const { data, error } = await supabase.storage
@@ -79,7 +70,7 @@ export const CourseCard = ({ course, likeCount, onClick }: Props) => {
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, [course.gpx_path, course.thumbnail_path]);
+  }, [course.gpx_path, thumbnailUrl]);
 
   return (
     <div
@@ -99,6 +90,7 @@ export const CourseCard = ({ course, likeCount, onClick }: Props) => {
           <img
             src={thumbnailUrl}
             alt={course.name}
+            loading="lazy"
             className="w-full h-full object-cover"
           />
         ) : (

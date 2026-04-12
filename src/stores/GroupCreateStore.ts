@@ -16,6 +16,7 @@ class GroupCreateStore {
   public courses: Course[] = [];
   public coursesLoading: boolean = false;
   public selectedCourseId: string | null = null;
+  public courseQuery: string = '';
 
   public constructor(navigate: NavigateFunction) {
     this.navigate = navigate;
@@ -37,6 +38,18 @@ class GroupCreateStore {
 
   public setSelectedCourseId(id: string | null): void {
     this.selectedCourseId = id;
+  }
+
+  public setCourseQuery(q: string): void {
+    this.courseQuery = q;
+  }
+
+  public get filteredCourses(): Course[] {
+    const q = this.courseQuery.trim().toLowerCase();
+    if (!q) return this.courses;
+    return this.courses.filter((c) =>
+      c.name.toLowerCase().includes(q) || (c.region ?? '').toLowerCase().includes(q),
+    );
   }
 
   public async fetchCourses(): Promise<void> {

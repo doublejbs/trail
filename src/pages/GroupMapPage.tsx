@@ -34,8 +34,8 @@ export const GroupMapPage = observer(() => {
   }, [groupMapStore, id]);
 
   useEffect(() => {
-    void uiStore.loadAvatarUrl();
-  }, [uiStore]);
+    if (groupMapStore.currentUserId) void uiStore.loadAvatarUrl(groupMapStore.currentUserId);
+  }, [uiStore, groupMapStore.currentUserId]);
 
   useEffect(() => {
     if (!mapRef.current || !groupMapStore.group) return;
@@ -81,6 +81,23 @@ export const GroupMapPage = observer(() => {
     });
     return disposer;
   }, [uiStore.checkpoints, mapStore, renderingStore, trackingStore]);
+
+  // 체크포인트 인증 시 코스 진행률 표시
+  useEffect(() => {
+    if (!mapStore.map) return;
+    const disposer = autorun(() => {
+      const visited = trackingStore.visitedCheckpointIds;
+      if (visited.size === 0) {
+        renderingStore.clearTrackingOverlays();
+        return;
+      }
+      const maxSort = uiStore.checkpoints
+        .filter((cp) => visited.has(cp.id))
+        .reduce((max, cp) => Math.max(max, cp.sort_order), 0);
+      if (maxSort > 0) renderingStore.updateRouteProgress(maxSort);
+    });
+    return disposer;
+  }, [mapStore.map, renderingStore, trackingStore, uiStore.checkpoints]);
 
   if (groupMapStore.group === null) return <Navigate to="/group" replace />;
 

@@ -96,7 +96,7 @@ export const CoursePage = observer(() => {
             <CourseCard
               key={course.id}
               course={course}
-              likeCount={0}
+              likeCount={course.like_count ?? 0}
               onClick={() => navigate(`/course/${course.id}`)}
             />
           ))}

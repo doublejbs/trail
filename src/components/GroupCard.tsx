@@ -1,38 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { User, ArrowRight, Ruler, Mountain } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Group } from '../types/group';
 
-export const useSignedUrl = (group: Group, elRef: React.RefObject<HTMLElement | null>) => {
-  const [url, setUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!group.thumbnail_path) return;
-    const el = elRef.current;
-    if (!el) return;
-
-    const bucket = group.thumbnail_path.endsWith('_thumb.png') && group.gpx_bucket === 'gpx-files'
-      ? 'gpx-files'
-      : 'course-gpx';
-
-    const obs = new IntersectionObserver(
-      async ([entry], o) => {
-        if (!entry?.isIntersecting) return;
-        o.disconnect();
-        try {
-          const { data, error } = await supabase.storage
-            .from(bucket)
-            .createSignedUrl(group.thumbnail_path!, 3600);
-          if (!error && data?.signedUrl) setUrl(data.signedUrl);
-        } catch { /* ignore */ }
-      },
-      { rootMargin: '200px', threshold: 0 },
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [group.thumbnail_path, group.gpx_bucket]);
-
-  return url;
+const getThumbnailUrl = (group: Group): string | null => {
+  if (!group.thumbnail_path) return null;
+  const bucket = group.thumbnail_path.endsWith('_thumb.png') && group.gpx_bucket === 'gpx-files'
+    ? 'gpx-files'
+    : 'course-gpx';
+  return supabase.storage.from(bucket).getPublicUrl(group.thumbnail_path).data.publicUrl;
 };
 
 const getGroupStatus = (group: Group): { label: string; active: boolean } => {
@@ -106,7 +82,7 @@ const MemberAvatars = ({ group, loading }: { group: Group; loading?: boolean }) 
 
 export const GroupCard = ({ group, onClick, membersLoading }: { group: Group; onClick: () => void; membersLoading?: boolean }) => {
   const ref = useRef<HTMLButtonElement>(null);
-  const url = useSignedUrl(group, ref);
+  const url = getThumbnailUrl(group);
   const [imgLoaded, setImgLoaded] = useState(false);
   const status = getGroupStatus(group);
 
@@ -123,6 +99,7 @@ export const GroupCard = ({ group, onClick, membersLoading }: { group: Group; on
           <img
             src={url}
             alt={group.name}
+            loading="lazy"
             onLoad={() => setImgLoaded(true)}
             className={`w-full h-full object-cover transition-opacity duration-200 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
           />

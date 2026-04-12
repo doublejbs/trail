@@ -149,6 +149,8 @@ export const CourseDetailPage = observer(() => {
             <p className="text-[13px] text-black/35">지도를 불러올 수 없습니다</p>
           </div>
         )}
+
+
       </div>
 
       {/* Scrollable detail */}

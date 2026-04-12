@@ -11,7 +11,7 @@ export const MyGroupsPage = observer(() => {
   const [onlyMine, setOnlyMine] = useState(false);
 
   useEffect(() => {
-    store.load();
+    store.load({ withMembership: true });
   }, [store]);
 
   if (store.loading) {

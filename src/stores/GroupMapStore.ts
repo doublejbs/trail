@@ -98,8 +98,8 @@ class GroupMapStore {
     channel.subscribe();
     this._periodChannel = channel;
 
-    // 폴링: 관리자가 아닌 경우에만 5초마다 그룹 상태 확인
-    const pollId = isAdmin ? null : setInterval(() => { void this._pollPeriodStatus(); }, 5000);
+    // broadcast 누락 대비 fallback 폴링 (30초 간격, 비관리자만)
+    const pollId = isAdmin ? null : setInterval(() => { void this._pollPeriodStatus(); }, 30_000);
 
     return () => {
       if (pollId) clearInterval(pollId);

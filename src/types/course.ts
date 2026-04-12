@@ -13,6 +13,7 @@ export interface Course {
   start_lng: number | null;
   is_public: boolean;
   created_at: string;
+  like_count?: number;
 }
 
 export interface CourseLike {

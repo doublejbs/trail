@@ -13,7 +13,7 @@ vi.mock('../lib/geolocation', () => ({
 const mockPolyline = { setMap: vi.fn() };
 const mockStartMarker = { setMap: vi.fn() };
 const mockEndMarker = { setMap: vi.fn() };
-const mockMap = { setCenter: vi.fn(), destroy: vi.fn(), fitBounds: vi.fn(), getBounds: vi.fn() };
+const mockMap = { setCenter: vi.fn(), morph: vi.fn(), getZoom: vi.fn(() => 14), destroy: vi.fn(), fitBounds: vi.fn(), getBounds: vi.fn() };
 const mockNaverMaps = {
   Map: vi.fn(function () { return mockMap; }),
   LatLng: vi.fn(function (lat: number, lng: number) { return { lat, lng }; }),
@@ -122,14 +122,14 @@ describe('MapStore', () => {
       expect(getCurrentPosition).toHaveBeenCalledOnce();
     });
 
-    it('calls map.setCenter with current position', async () => {
+    it('calls map.morph with current position and zoom', async () => {
       (window as unknown as Record<string, unknown>).naver = { maps: mockNaverMaps };
       const div = document.createElement('div');
       store.initMap(div);
       vi.mocked(getCurrentPosition).mockResolvedValue({ latitude: 37.1, longitude: 127.1 });
       store.locate();
       await vi.waitFor(() => {
-        expect(mockMap.setCenter).toHaveBeenCalledWith({ lat: 37.1, lng: 127.1 });
+        expect(mockMap.morph).toHaveBeenCalledWith({ lat: 37.1, lng: 127.1 }, 15);
       });
     });
   });

@@ -27,7 +27,7 @@ class GroupStore {
     this.filter = f;
   }
 
-  public async load(): Promise<void> {
+  public async load(options?: { withMembership?: boolean }): Promise<void> {
     this.loading = true;
     this.membersLoading = true;
     this.error = false;
@@ -42,15 +42,6 @@ class GroupStore {
 
     const userId = userData?.user?.id ?? null;
 
-    let joinedIds = new Set<string>();
-    if (userId) {
-      const { data: memberships } = await supabase
-        .from('group_members')
-        .select('group_id')
-        .eq('user_id', userId);
-      joinedIds = new Set((memberships ?? []).map((m) => m.group_id));
-    }
-
     if (error) {
       runInAction(() => {
         this.error = true;
@@ -60,12 +51,21 @@ class GroupStore {
       return;
     }
 
+    // 참가중 탭: 가입한 그룹 ID를 loading 해제 전에 조회
+    let joinedIds = new Set<string>();
+    if (options?.withMembership && userId) {
+      const { data: memberships } = await supabase
+        .from('group_members')
+        .select('group_id')
+        .eq('user_id', userId);
+      for (const m of memberships ?? []) joinedIds.add(m.group_id);
+    }
+
     const groups: Group[] = (data ?? []).map((g: Record<string, unknown>) => {
       const counts = g.group_members as { count: number }[] | undefined;
       return { ...g, member_count: counts?.[0]?.count ?? 0 } as Group;
     });
 
-    // 1단계: 그룹 목록 먼저 표시
     runInAction(() => {
       this.groups = groups;
       this.currentUserId = userId;
@@ -73,7 +73,7 @@ class GroupStore {
       this.loading = false;
     });
 
-    // 2단계: 멤버 아바타 비동기 로드
+    // 멤버 아바타 비동기 로드
     void this._loadMembers(groups);
   }
 

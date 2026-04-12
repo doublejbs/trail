@@ -1,4 +1,5 @@
 import { makeAutoObservable, observable, runInAction } from "mobx";
+import { haversineMeters } from '../utils/routeProjection';
 import type { Checkpoint } from '../types/checkpoint';
 
 function createPinHtml(color: string): string {
@@ -17,6 +18,12 @@ class MapRenderingStore {
   private _checkpointMarkers: Map<string, naver.maps.Marker> = new Map();
   private _checkpointCircles: Map<string, naver.maps.Circle> = new Map();
   private _onCheckpointTap: ((checkpointId: string) => void) | null = null;
+
+  // 트래킹 오버레이
+  private _progressPolyline: naver.maps.Polyline | null = null;
+  private _remainPolyline: naver.maps.Polyline | null = null;
+  private _routeCoords: { lat: number; lon: number }[] = [];
+  private _routeDimmed: boolean = false;
 
   private getMap: () => naver.maps.Map | null;
 
@@ -54,6 +61,8 @@ class MapRenderingStore {
       }));
 
     if (allPoints.length === 0) return false;
+
+    this._routeCoords = allPoints;
 
     // 이전 경로/마커 정리 (재호출 시 leak 방지)
     this.gpxPolyline?.setMap(null);
@@ -315,8 +324,95 @@ class MapRenderingStore {
     this._checkpointCircles.clear();
   }
 
+  /** 코스 진행률: 기존 라인 숨기고 완료/미완료 두 라인으로 교체 */
+  public updateRouteProgress(progressMeters: number): void {
+    const map = this.getMap();
+    if (!map || this._routeCoords.length < 2 || progressMeters <= 0) return;
+
+    // 기존 코스 라인 숨기기
+    if (!this._routeDimmed) {
+      this._routeDimmed = true;
+      this.gpxPolyline?.setMap(null);
+      this._extraPolylines.forEach((p) => p.setMap(null));
+    }
+
+    // 완료/미완료 경로 분리
+    const donePath: naver.maps.LatLng[] = [];
+    const remainPath: naver.maps.LatLng[] = [];
+    let accumulated = 0;
+    let splitDone = false;
+
+    for (let i = 0; i < this._routeCoords.length; i++) {
+      const pt = this._routeCoords[i];
+      const latlng = new window.naver.maps.LatLng(pt.lat, pt.lon);
+
+      if (!splitDone) {
+        donePath.push(latlng);
+        if (i > 0) {
+          const prev = this._routeCoords[i - 1];
+          const segDist = haversineMeters(prev.lat, prev.lon, pt.lat, pt.lon);
+          if (accumulated + segDist >= progressMeters) {
+            // 보간점 계산
+            const ratio = (progressMeters - accumulated) / segDist;
+            const interpLat = prev.lat + (pt.lat - prev.lat) * ratio;
+            const interpLng = prev.lon + (pt.lon - prev.lon) * ratio;
+            const splitPt = new window.naver.maps.LatLng(interpLat, interpLng);
+            donePath[donePath.length - 1] = splitPt;
+            remainPath.push(splitPt, latlng);
+            splitDone = true;
+          } else {
+            accumulated += segDist;
+          }
+        }
+      } else {
+        remainPath.push(latlng);
+      }
+    }
+
+    // 완료 라인 (흐린 주황)
+    if (this._progressPolyline) {
+      this._progressPolyline.setPath(donePath);
+    } else if (donePath.length >= 2) {
+      this._progressPolyline = new window.naver.maps.Polyline({
+        map,
+        path: donePath,
+        strokeColor: '#FF5722',
+        strokeWeight: 4,
+        strokeOpacity: 0.2,
+      });
+    }
+
+    // 미완료 라인 (진한 주황)
+    if (this._remainPolyline) {
+      this._remainPolyline.setPath(remainPath);
+    } else if (remainPath.length >= 2) {
+      this._remainPolyline = new window.naver.maps.Polyline({
+        map,
+        path: remainPath,
+        strokeColor: '#FF5722',
+        strokeWeight: 5,
+        strokeOpacity: 0.9,
+      });
+    }
+  }
+
+  /** 트래킹 오버레이 정리 + 코스 라인 복원 */
+  public clearTrackingOverlays(): void {
+    this._progressPolyline?.setMap(null);
+    this._progressPolyline = null;
+    this._remainPolyline?.setMap(null);
+    this._remainPolyline = null;
+    if (this._routeDimmed) {
+      this._routeDimmed = false;
+      const map = this.getMap();
+      this.gpxPolyline?.setMap(map);
+      this._extraPolylines.forEach((p) => p.setMap(map));
+    }
+  }
+
   public destroy(): void {
     this.clearGpxRoute();
+    this.clearTrackingOverlays();
     this.clearCheckpoints();
   }
 }
